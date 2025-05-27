@@ -1,33 +1,27 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { LiteClient as algoliasearch } from 'algoliasearch/lite';
-
-import { Input } from '@/components/ui/input';
+import { Check, ChevronsUpDown } from "lucide-react"
+import { Configure, Hits, InstantSearch, useSearchBox } from "react-instantsearch";
+import { liteClient as algoliasearch } from "algoliasearch/lite";
 import {
   Popover,
   PopoverTrigger,
   PopoverContent
 } from '@/components/ui/popover';
 import {
-  Card,
-  CardContent,
-  CardTitle,
-  CardDescription
-} from '@/components/ui/card';
+  Command,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command"
+import { Button } from "./ui/button";
+import { useState } from "react";
+import { ProjectHit } from "@/models/ProjectHit";
 
 const searchClient = algoliasearch(
   process.env.NEXT_PUBLIC_ALGOLIA_APP_ID!,
   process.env.NEXT_PUBLIC_ALGOLIA_SEARCH_API_KEY!
 );
-
-interface ProjectHit {
-  objectID: string;
-  docId: number;
-  client: string;
-  description: string;
-  location: string;
-}
 
 function mapAlgoliaHit(hit: any): ProjectHit {
   return {
@@ -39,98 +33,84 @@ function mapAlgoliaHit(hit: any): ProjectHit {
   };
 }
 
-function CustomCombobox() {
-  // InstantSearch hooks
-  const { query, refine } = useSearchBox();
-  const { hits: rawHits } = useHits();
-  const hits = rawHits.map(mapAlgoliaHit);
-
-  // local input + open state
-  const [input, setInput] = useState(query);
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // debounce refine
-  useEffect(() => {
-    const t = setTimeout(() => {
-      refine(input);
-      if (input && rawHits.length > 0) {
-        setOpen(true);
-      }
-    }, 250);
-    return () => clearTimeout(t);
-  }, [input, refine]);
-
-  // close on outside click
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-  }, []);
-
-  return (
-    <div ref={containerRef} className="relative w-full max-w-lg">
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Input
-            placeholder="Search projects…"
-            value={input}
-            onChange={(e) => setInput(e.currentTarget.value)}
-            onFocus={() => input && hits.length > 0 && setOpen(true)}
-            className="w-full"
-            autoComplete="off"
-          />
-        </PopoverTrigger>
-        <PopoverContent className="w-full p-0 mt-1">
-          {hits.length > 0 ? (
-            <div className="space-y-2 max-h-80 overflow-y-auto p-2">
-              {hits.map((hit) => (
-                <Card
-                  key={hit.objectID}
-                  className="cursor-pointer hover:shadow-md"
-                  onClick={() => {
-                    setInput(hit.client);
-                    setOpen(false);
-                    // e.g. router.push(`/projects/${hit.docId}`)
-                  }}
-                >
-                  <CardContent className="flex flex-col space-y-1">
-                    <CardTitle className="text-sm text-gray-500">
-                      #{hit.docId}
-                    </CardTitle>
-                    <h3 className="font-semibold">{hit.client}</h3>
-                    <CardDescription className="text-xs line-clamp-2">
-                      {hit.description}
-                    </CardDescription>
-                    <p className="text-xs text-gray-500">{hit.location}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="p-4 text-center text-sm text-muted-foreground">
-              {input ? `No results for “${input}”` : 'Type to search…'}
-            </div>
-          )}
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
-}
-
 export default function SearchProject() {
+  const [open, setOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<ProjectHit | null>(null);
+
+  function CustomSearchBox() {
+      const { refine, clear, query } = useSearchBox();
+
+      return (
+        <CommandInput
+          placeholder="Search projects..."
+          value={query}
+          onValueChange={(value) => refine(value)}
+          className=""
+        />
+      )
+  }
+  
+  const ProjectHitComponent = ({ hit }: { hit: any }) => {
+    const project = mapAlgoliaHit(hit);
+    return (
+      <Button
+        variant="ghost"
+        className="w-full h-[100px] text-left m-2"
+        onClick={() => {
+          setSelectedProject(project);
+          setOpen(false);
+        }}
+      >
+        <div className="w-full text-left space-y-2 p-8">
+          <p className="font-semibold">{project.docId} - {project.client}</p>
+          <p className="text-sm text-muted-foreground">{project.description}</p>
+          <p className="text-xs text-muted-foreground">{project.location}</p>
+        </div>
+      </Button>
+    );
+  };
+
   return (
     <InstantSearch
       searchClient={searchClient}
       indexName="projects"
-      // keep SearchBox state alive if you ever unmount/remount
       future={{ preserveSharedStateOnUnmount: true }}
     >
-      <CustomCombobox />
+      <Configure filters="active:true" />
+      <div className="w-full max-w-md mx-auto">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              className="w-[400px] justify-between"
+            >
+              {selectedProject
+              ? `${selectedProject.docId} - ${selectedProject.client}`
+              : "Select Project..."}
+              <ChevronsUpDown className="opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-full max-h-96 overflow-y-auto">
+            <Command>
+              <CustomSearchBox />
+              <Hits hitComponent={ProjectHitComponent} />
+              <CommandGroup>
+                <CommandItem
+                  onSelect={() => {
+                    setOpen(false);
+                    // handle reset
+                  }}
+                >
+                  <Check className="mr-2" />
+                  Clear Selection
+                </CommandItem>
+              </CommandGroup>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      </div>
     </InstantSearch>
   );
 }
