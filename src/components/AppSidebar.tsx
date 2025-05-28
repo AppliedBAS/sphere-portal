@@ -3,63 +3,78 @@
 import {
   ArrowUpCircleIcon,
   FileBarChart2,
-  ShoppingCart,
   Users,
   LayoutDashboard,
   TrendingUp,
   ClipboardCheck,
   FolderIcon,
+  SettingsIcon,
+  HelpCircle,
+  CreditCardIcon,
 } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
+  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "./ui/sidebar";
 import NavMain from "./NavMain";
+import NavSecondary from "./NavSecondary";
+import NavUser from "./NavUser";
+import NavDocuments from "./NavDocuments";
 const data = {
   navMain: [
     {
       title: "Dashboard",
-      url: "#",
+      url: "/dashboard",
       icon: LayoutDashboard,
     },
     {
       title: "Analytics",
-      url: "#",
+      url: "/dashboard/analytics",
       icon: TrendingUp, // Using ArrowUpCircleIcon as a better analytics icon
     },
     {
-        title: "Projects",
-        url: "#",
-        icon: FolderIcon,
+      title: "Projects",
+      url: "dashboard/projects",
+      icon: FolderIcon,
     },
     {
-        title: "Clients",
-        url: "#",
-        icon: Users,
-    }
+      title: "Clients",
+      url: "dashboard/clients",
+      icon: Users,
+    },
+  ],
+  navSecondary: [
+    {
+      title: "Settings",
+      url: "#",
+      icon: SettingsIcon,
+    },
+    {
+      title: "Help",
+      url: "#",
+      icon: HelpCircle, // Placeholder for help icon
+    },
   ],
   documents: [
     {
       title: "Service Reports",
-      url: "#",
+      url: "/dashboard/service-reports",
       icon: ClipboardCheck,
     },
     {
       title: "Project Reports",
-      url: "#",
+      url: "/dashboard/project-reports",
       icon: FileBarChart2,
     },
     {
       title: "Purchase Orders",
-      url: "#",
-      icon: ShoppingCart,
+      url: "/dashboard/purchase-orders",
+      icon: CreditCardIcon,
     },
   ],
 };
@@ -84,24 +99,12 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        <SidebarGroup>
-          <SidebarGroupLabel>Documents</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {data.documents.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <a href={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <NavDocuments items={data.documents} />
+        <NavSecondary items={data.navSecondary} />
       </SidebarContent>
+      <SidebarFooter>
+        <NavUser />
+      </SidebarFooter>
     </Sidebar>
   );
 }

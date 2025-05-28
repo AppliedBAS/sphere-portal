@@ -33,7 +33,7 @@ function mapAlgoliaHit(hit: any): ProjectHit {
   };
 }
 
-export default function SearchProject() {
+export default function ProjectSelect() {
   const [open, setOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectHit | null>(null);
 

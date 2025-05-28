@@ -42,12 +42,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
-      setUser(fbUser);
-      setLoading(false);
-
-      if (fbUser) {
-        router.replace("/dashboard");
-      } else {
+        setUser(fbUser);
+        setLoading(false);
+      if (!fbUser) {
         router.replace("/login");
       }
     });

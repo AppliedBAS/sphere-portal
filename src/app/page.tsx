@@ -13,7 +13,7 @@ export default function Home() {
           }
         `}
       </style>
-      Hello
+      Loading...
     </div>
   )
 }
