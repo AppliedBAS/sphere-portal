@@ -2,10 +2,12 @@ import { AlgoliaSelect } from "@/components/AlgoliaSelect";
 import { Hit } from "algoliasearch/lite";
 import { ProjectHit } from "@/models/ProjectHit";
 
-export default function ProjectSelect(props: {
+interface ProjectSelectProps {
   selectedProject: ProjectHit | null;
   setSelectedProject: (p: ProjectHit | null) => void;
-}) {
+}
+
+export default function ProjectSelect(props: ProjectSelectProps) {
   return (
     <AlgoliaSelect<ProjectHit>
       indexName="projects"
@@ -22,7 +24,7 @@ export default function ProjectSelect(props: {
         location: hit.location as string,
       })}
       renderItem={(proj) => (
-        <div className="flex flex-col">
+        <div className="flex flex-col py-4">
           <span className="font-semibold">
             {proj.docId} – {proj.client}
           </span>

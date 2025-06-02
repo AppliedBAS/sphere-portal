@@ -16,22 +16,18 @@ import {
   CommandItem,
 } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
-
-export interface Employee {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-}
+import { Employee } from "@/models/Employee";
 
 interface EmployeeSelectProps {
   selectedEmployee: Employee | null;
   setSelectedEmployee: React.Dispatch<React.SetStateAction<Employee | null>>;
+  placeholder: string;
 }
 
 export default function EmployeeSelect({
   selectedEmployee,
   setSelectedEmployee,
+  placeholder = "Select an employee...",
 }: EmployeeSelectProps) {
   const [open, setOpen] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -51,6 +47,12 @@ export default function EmployeeSelect({
             name: data.name,
             email: data.email,
             phone: data.phone,
+            active: data.active ?? true,
+            clientId: data.clientId ?? "",
+            clientSecret: data.clientSecret ?? "",
+            createdAt: data.createdAt ?? null,
+            updatedAt: data.updatedAt ?? null,
+            policy: data.policy ?? [],
           };
         });
         setEmployees(list);
@@ -83,7 +85,7 @@ export default function EmployeeSelect({
           >
             {selectedEmployee
               ? selectedEmployee.name
-              : "Select Employee..."}
+              : placeholder }
             <ChevronsUpDown className="opacity-50" />
           </Button>
         </PopoverTrigger>

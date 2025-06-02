@@ -62,7 +62,7 @@ export function AlgoliaSelect<HitType>({
   );
 
   return (
-    <div className="max-w-[400px]">
+    <div className="w-[400px]">
       <InstantSearch searchClient={client} indexName={indexName}>
         <Configure hitsPerPage={hitsPerPage} />
 
