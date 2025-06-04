@@ -64,7 +64,7 @@ export function AlgoliaSelect<HitType>({
   return (
     <div className="w-[400px]">
       <InstantSearch searchClient={client} indexName={indexName}>
-        <Configure hitsPerPage={hitsPerPage} />
+        <Configure filters="active:true" />
 
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>

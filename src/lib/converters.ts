@@ -1,7 +1,7 @@
 import { ProjectReport } from "@/models/ProjectReport";
 import { DocumentData, FirestoreDataConverter } from "firebase/firestore";
 
-
+// Firestore object converters
 export const projectReportConverter: FirestoreDataConverter<ProjectReport> = {
     toFirestore: (report: ProjectReport): DocumentData => {
         return {

@@ -24,7 +24,7 @@ export default function ProjectSelect(props: ProjectSelectProps) {
         location: hit.location as string,
       })}
       renderItem={(proj) => (
-        <div className="flex flex-col py-4">
+        <div className="flex flex-col py-2">
           <span className="font-semibold">
             {proj.docId} – {proj.client}
           </span>

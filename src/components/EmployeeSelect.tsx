@@ -1,9 +1,8 @@
+// src/components/EmployeeSelect.tsx
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
-import { collection, DocumentData, getDocs } from "firebase/firestore";
-import { firestore } from "@/lib/firebase";
 import {
   Popover,
   PopoverTrigger,
@@ -19,50 +18,28 @@ import { Button } from "@/components/ui/button";
 import { Employee } from "@/models/Employee";
 
 interface EmployeeSelectProps {
+  employees: Employee[];
+  loading: boolean;
+  error: Error | null;
+  refetch: () => void;
   selectedEmployee: Employee | null;
-  setSelectedEmployee: React.Dispatch<React.SetStateAction<Employee | null>>;
-  placeholder: string;
+  setSelectedEmployee: (empl: Employee | null) => void;
+  placeholder?: string;
 }
 
 export default function EmployeeSelect({
+  employees,
+  loading,
+  error,
+  refetch,
   selectedEmployee,
   setSelectedEmployee,
   placeholder = "Select an employee...",
 }: EmployeeSelectProps) {
   const [open, setOpen] = useState(false);
-  const [employees, setEmployees] = useState<Employee[]>([]);
   const [query, setQuery] = useState("");
 
-  // Fetch employees when popover opens
-  useEffect(() => {
-    if (!open || employees.length) return;
-
-    (async () => {
-      try {
-        const snapshot = await getDocs(collection(firestore, "employees"));
-        const list: Employee[] = snapshot.docs.map((doc) => {
-          const data = doc.data() as DocumentData;
-          return {
-            id: doc.id,
-            name: data.name,
-            email: data.email,
-            phone: data.phone,
-            active: data.active ?? true,
-            clientId: data.clientId ?? "",
-            clientSecret: data.clientSecret ?? "",
-            createdAt: data.createdAt ?? null,
-            updatedAt: data.updatedAt ?? null,
-            policy: data.policy ?? [],
-          };
-        });
-        setEmployees(list);
-      } catch (err) {
-        console.error("Error loading employees:", err);
-      }
-    })();
-  }, [open, employees.length]);
-
-  // Filtered list
+  // Only filter once employees arrive
   const filtered = useMemo(() => {
     if (!query) return employees;
     const lower = query.toLowerCase();
@@ -82,10 +59,14 @@ export default function EmployeeSelect({
             role="combobox"
             aria-expanded={open}
             className="w-[400px] justify-between"
+            onClick={() => {
+              // Refetch employees any time the popover opens if the list is empty
+              if (!open && employees.length === 0) {
+                refetch();
+              }
+            }}
           >
-            {selectedEmployee
-              ? selectedEmployee.name
-              : placeholder }
+            {selectedEmployee ? selectedEmployee.name : placeholder}
             <ChevronsUpDown className="opacity-50" />
           </Button>
         </PopoverTrigger>
@@ -99,27 +80,35 @@ export default function EmployeeSelect({
             />
 
             <CommandGroup>
-              {filtered.map((emp) => (
-                <CommandItem
-                  key={emp.id}
-                  onSelect={() => {
-                    setSelectedEmployee(emp);
-                    setOpen(false);
-                    setQuery("");
-                  }}
-                >
-                  <div className="flex flex-col">
-                    <span className="font-medium">{emp.name}</span>
-                    <span className="text-sm text-muted-foreground">
-                      {emp.email}
-                    </span>
-                  </div>
-                </CommandItem>
-              ))}
-
-              {filtered.length === 0 && (
+              {loading && (
+                <CommandItem disabled>Loading employees…</CommandItem>
+              )}
+              {error && (
+                <CommandItem disabled>Error loading employees.</CommandItem>
+              )}
+              {!loading && !error && filtered.length === 0 && (
                 <CommandItem disabled>No employees found.</CommandItem>
               )}
+
+              {!loading &&
+                !error &&
+                filtered.map((emp) => (
+                  <CommandItem
+                    key={emp.id}
+                    onSelect={() => {
+                      setSelectedEmployee(emp);
+                      setOpen(false);
+                      setQuery("");
+                    }}
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-semibold">{emp.name}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {emp.email}
+                      </span>
+                    </div>
+                  </CommandItem>
+                ))}
 
               <CommandItem
                 onSelect={() => {
