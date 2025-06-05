@@ -3,8 +3,13 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { firestore } from "@/lib/firebase";
-import { collection, getDocs, Timestamp, DocumentReference } from "firebase/firestore";
-import { ProjectReport } from "@/models/ProjectReport";
+import {
+  collection,
+  getDocs,
+  Timestamp,
+  DocumentReference,
+} from "firebase/firestore";
+import { ServiceReport } from "@/models/ServiceReport";
 
 import {
   Table,
@@ -26,13 +31,15 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 
-export default function ProjectReports() {
-  const [reports, setReports] = useState<ProjectReport[]>([]);
+export default function ServiceReports() {
+  const [reports, setReports] = useState<ServiceReport[]>([]);
   const [loading, setLoading] = useState(true);
 
   // --- Table state ---
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortColumn, setSortColumn] = useState<"clientName" | "location" | "createdAt">("createdAt");
+  const [sortColumn, setSortColumn] = useState<
+    "clientName" | "serviceAddress" | "createdAt"
+  >("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [pageIndex, setPageIndex] = useState(0);
   const pageSize = 25;
@@ -40,25 +47,50 @@ export default function ProjectReports() {
   useEffect(() => {
     async function fetchReports() {
       setLoading(true);
-      const querySnapshot = await getDocs(collection(firestore, "project reports"));
+      const querySnapshot = await getDocs(
+        collection(firestore, "reports")
+      );
       const data = querySnapshot.docs.map((doc) => {
         const raw = doc.data();
+
+        // NOTE: Adjust the field‐access strings (like "client-name", "service-address-1", etc.)
+        // to match exactly your Firestore keys. Below is a typical mapping assuming kebab‐case keys.
+        const serviceAddress1: string = raw["service-address1"] as string;
+        const serviceAddress2: string = raw["service-address2"] as string;
+
         return {
-          // Use Firestore document ID as `id`
           id: doc.id,
-          docId: raw["doc-id"] as number,
-          projectDocId: raw["project-doc-id"] as number,
-          clientName: raw["client-name"] as string,
-          location: raw.location as string,
-          description: raw.description as string,
-          notes: raw.notes as string,
-          materials: raw.materials as string,
-          draft: raw.draft as boolean,
-          createdAt: raw["created-at"] as Timestamp,
           authorTechnicianRef: raw["author-technician-ref"] as DocumentReference,
-          leadTechnicianRef: raw["lead-technician-ref"] as DocumentReference | undefined,
-          assignedTechniciansRef: raw["assigned-technicians-ref"] as DocumentReference[] | undefined,
-        } as ProjectReport;
+          cityStateZip: raw["city-state-zip"] as string,
+          clientName: raw["client-name"] as string,
+          contactEmail: raw["contact-email"] as string,
+          contactPhone: raw["contact-phone"] as string,
+          contactName: raw["contact-name"] as string,
+          createdAt: raw["created-at"] as Timestamp,
+          dateSigned: raw["date-signed"] as Timestamp | undefined,
+          draft: raw["draft"] as boolean,
+          materialNotes: raw["material-notes"] as string,
+          printedName: raw["printed-name"] as string,
+          serviceAddress1: serviceAddress1,
+          serviceAddress2: serviceAddress2,
+          serviceNotes: (raw["service-notes"] as Array<{
+            date: Timestamp;
+            "helper-overtime": string;
+            "helper-time": string;
+            "remote-work": string;
+            "service-notes": string;
+            "technician-overtime": string;
+            "technician-time": string;
+          }>).map((note) => ({
+            date: note.date as Timestamp,
+            helperOvertime: note["helper-overtime"] as string,
+            helperTime: note["helper-time"] as string,
+            remoteWork: note["remote-work"] as string,
+            serviceNotes: note["service-notes"] as string,
+            technicianOvertime: note["technician-overtime"] as string,
+            technicianTime: note["technician-time"] as string,
+          })),
+        } as ServiceReport;
       });
 
       setReports(data);
@@ -68,14 +100,15 @@ export default function ProjectReports() {
     fetchReports();
   }, []);
 
-  // 1) Filter by searchTerm (clientName or location)
+  // 1) Filter by searchTerm (clientName or serviceAddress1)
   const filtered = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     if (!term) return reports;
     return reports.filter((r) => {
       return (
         r.clientName.toLowerCase().includes(term) ||
-        r.location.toLowerCase().includes(term)
+        r.serviceAddress1.toLowerCase().includes(term) ||
+        r.cityStateZip.toLowerCase().includes(term)
       );
     });
   }, [reports, searchTerm]);
@@ -89,9 +122,9 @@ export default function ProjectReports() {
       if (sortColumn === "clientName") {
         aVal = a.clientName.toLowerCase();
         bVal = b.clientName.toLowerCase();
-      } else if (sortColumn === "location") {
-        aVal = a.location.toLowerCase();
-        bVal = b.location.toLowerCase();
+      } else if (sortColumn === "serviceAddress") {
+        aVal = a.serviceAddress1.toLowerCase();
+        bVal = b.serviceAddress1.toLowerCase();
       } else {
         // createdAt
         aVal = a.createdAt.toMillis();
@@ -125,7 +158,7 @@ export default function ProjectReports() {
   // Helper to format Firestore Timestamp
   const formatDate = (ts: Timestamp) => ts.toDate().toLocaleString();
 
-  const toggleSort = (column: "clientName" | "location" | "createdAt") => {
+  const toggleSort = (column: "clientName" | "serviceAddress" | "createdAt") => {
     if (sortColumn === column) {
       setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
     } else {
@@ -141,12 +174,12 @@ export default function ProjectReports() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Project Reports</h1>
+      <h1 className="text-2xl font-bold">Service Reports</h1>
 
       {/* Search Input */}
       <div className="flex items-center gap-2">
         <Input
-          placeholder="Search by client or location…"
+          placeholder="Search by client or service address…"
           value={searchTerm}
           onChange={(e) => {
             setSearchTerm(e.currentTarget.value);
@@ -169,7 +202,6 @@ export default function ProjectReports() {
       {/* Table */}
       <Table>
         <TableHeader>
-          {/* Wrap all <TableHead> in a single <TableRow> */}
           <TableRow>
             <TableHead
               className="cursor-pointer"
@@ -185,14 +217,13 @@ export default function ProjectReports() {
                   ))}
               </div>
             </TableHead>
-
             <TableHead
               className="cursor-pointer"
-              onClick={() => toggleSort("location")}
+              onClick={() => toggleSort("serviceAddress")}
             >
               <div className="flex items-center">
-                Location
-                {sortColumn === "location" &&
+                Service Address
+                {sortColumn === "serviceAddress" &&
                   (sortDirection === "asc" ? (
                     <ChevronUp className="h-4 w-4 ml-1" />
                   ) : (
@@ -200,9 +231,7 @@ export default function ProjectReports() {
                   ))}
               </div>
             </TableHead>
-
-            <TableHead>Description</TableHead>
-
+            <TableHead>Contact</TableHead>
             <TableHead
               className="cursor-pointer"
               onClick={() => toggleSort("createdAt")}
@@ -217,7 +246,6 @@ export default function ProjectReports() {
                   ))}
               </div>
             </TableHead>
-
             <TableHead>Status</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
@@ -225,12 +253,18 @@ export default function ProjectReports() {
 
         <TableBody>
           {paginated.map((report) => (
-            // Use report.id (the Firestore doc ID) as the key
             <TableRow key={report.id}>
               <TableCell>{report.clientName}</TableCell>
-              <TableCell>{report.location}</TableCell>
               <TableCell className="max-w-xs truncate">
-                {report.description}
+                {report.serviceAddress1}
+                {report.serviceAddress2 ? `, ${report.serviceAddress2}` : ""}
+                <br />
+                <span className="text-sm text-muted-foreground">{report.cityStateZip}</span>
+              </TableCell>
+              <TableCell>
+                {report.contactName}
+                <br />
+                <span className="text-sm text-muted-foreground">{report.contactPhone}</span>
               </TableCell>
               <TableCell>{formatDate(report.createdAt)}</TableCell>
               <TableCell>
@@ -250,8 +284,6 @@ export default function ProjectReports() {
                   </Badge>
                 )}
               </TableCell>
-
-              {/* Actions: Edit+View if draft; only View otherwise */}
               <TableCell>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -262,15 +294,11 @@ export default function ProjectReports() {
                   <DropdownMenuContent align="end">
                     {report.draft && (
                       <DropdownMenuItem asChild>
-                        <Link href={`/project-reports/${report.id}/edit`}>
-                          Edit
-                        </Link>
+                        <Link href={`/service-reports/${report.id}/edit`}>Edit</Link>
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuItem asChild>
-                      <Link href={`/project-reports/${report.id}`}>
-                        View
-                      </Link>
+                      <Link href={`/service-reports/${report.id}`}>View</Link>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>

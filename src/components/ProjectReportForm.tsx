@@ -156,6 +156,11 @@ export default function ProjectReportForm({ projectReport }: ProjectReportFormPr
         throw new Error(`Failed to send email: ${errorText}`);
       }
 
+      setProject(null);
+      setLeadEmployee(null);
+      setAssignedTechnicians([]);
+      setNotes("");
+      setAdditionalMaterials("");
       toast.success("Report submitted successfully!");
     } catch (error) {
       console.error("Error generating report:", error);

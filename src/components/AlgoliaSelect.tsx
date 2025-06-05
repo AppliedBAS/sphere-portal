@@ -1,11 +1,23 @@
-"use client";
-
 import React, { useState } from "react";
 import { ChevronsUpDown } from "lucide-react";
-import { InstantSearch, Configure, Hits, useSearchBox } from "react-instantsearch";
+import {
+  InstantSearch,
+  Configure,
+  Hits,
+  useSearchBox,
+} from "react-instantsearch";
 import { liteClient as algoliasearch, Hit } from "algoliasearch/lite";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { Command, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
 
 export interface AlgoliaSelectProps<HitType> {
@@ -27,7 +39,6 @@ export function AlgoliaSelect<HitType>({
   renderItem,
   selected,
   onSelect,
-  hitsPerPage = 10,
 }: AlgoliaSelectProps<HitType>) {
   const [open, setOpen] = useState(false);
 
