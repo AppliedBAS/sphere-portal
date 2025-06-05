@@ -1,5 +1,6 @@
+"use client";
 import * as React from "react";
-import { LucideIcon } from "lucide-react";
+import { LucideIcon, SunMoonIcon } from "lucide-react";
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -7,6 +8,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { useTheme } from "next-themes";
 
 interface Item {
   title: string;
@@ -15,6 +17,12 @@ interface Item {
 }
 
 export default function NavSecondary({ items }: { items: Item[] }) {
+  const { theme, setTheme } = useTheme();
+
+  const toggleTheme = () => {
+    setTheme(theme === "light" ? "dark" : "light");
+  };
+
   return (
     <SidebarGroup className="mt-auto">
       <SidebarGroupContent>
@@ -29,6 +37,14 @@ export default function NavSecondary({ items }: { items: Item[] }) {
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <div className="flex items-center gap-2 cursor-pointer" onClick={toggleTheme}>
+                <SunMoonIcon className="h-5 w-5" />
+                <span>Toggle Theme</span>
+              </div>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>

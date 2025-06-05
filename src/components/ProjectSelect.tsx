@@ -1,6 +1,6 @@
 import { AlgoliaSelect } from "@/components/AlgoliaSelect";
+import { ProjectHit } from "@/models/Project";
 import { Hit } from "algoliasearch/lite";
-import { ProjectHit } from "@/models/ProjectHit";
 
 interface ProjectSelectProps {
   selectedProject: ProjectHit | null;

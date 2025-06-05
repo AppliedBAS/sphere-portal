@@ -3,11 +3,13 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { ThemeToggleButton } from "@/components/ThemeToggleButton";
 import { Button } from "@/components/ui/button";
+import { SunMoonIcon } from "lucide-react";
+import { useTheme } from "next-themes";
 
 export default function LoginPage() {
   const { user, loading, login } = useAuth();
+  const { theme, setTheme } = useTheme();
   const router = useRouter();
 
   useEffect(() => {
@@ -19,10 +21,17 @@ export default function LoginPage() {
   if (loading) return <p>Loading…</p>;
   if (user) return <p>Redirecting…</p>;
 
+  const toggleTheme = () => {
+    setTheme(theme === "light" ? "dark" : "light");
+  };
+
   return (
     <div className="fixed inset-0 flex items-center justify-center">
       <div className="absolute top-4 right-4">
-        <ThemeToggleButton />
+        <div className="flex items-center gap-2 cursor-pointer" onClick={toggleTheme}>
+          <SunMoonIcon className="h-5 w-5" />
+          <span>Toggle Theme</span>
+        </div>
       </div>
       <Button
         onClick={login}

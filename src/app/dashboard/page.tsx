@@ -14,6 +14,15 @@ import { ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface Counts {
   projectReports: number;
@@ -100,14 +109,59 @@ export default function Dashboard() {
       {/* 1. Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Dashboard</h1>
-        <Button variant="secondary">Create New Report</Button>
+
+        {/* Dialog Trigger for “Create New Report” */}
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="secondary">Create New Report</Button>
+          </DialogTrigger>
+
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Select Report Type</DialogTitle>
+              <DialogDescription>
+                Choose which kind of report you want to create.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-3 py-4">
+              <Button
+                variant="outline"
+                onClick={() =>
+                  router.push("/dashboard/service-reports/create")
+                }
+              >
+                Service Report
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  router.push("/dashboard/project-reports/create")
+                }
+              >
+                Project Report
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  router.push("/dashboard/purchase-orders/create")
+                }
+              >
+                Purchase Order
+              </Button>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline">Cancel</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* 2. Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Project Reports Card */}
         <Card className="relative p-6 flex flex-col">
-          {/* top-right icon */}
           <Button
             variant="ghost"
             size="icon"
@@ -134,7 +188,6 @@ export default function Dashboard() {
 
         {/* Service Reports Card */}
         <Card className="relative p-6 flex flex-col">
-          {/* top-right icon */}
           <Button
             variant="ghost"
             size="icon"
@@ -161,7 +214,6 @@ export default function Dashboard() {
 
         {/* Purchase Orders Card */}
         <Card className="relative p-6 flex flex-col">
-          {/* top-right icon */}
           <Button
             variant="ghost"
             size="icon"
@@ -190,7 +242,6 @@ export default function Dashboard() {
 
         {/* Draft Reports Card */}
         <Card className="relative p-6 flex flex-col">
-          {/* top-right icon */}
           <Button
             variant="ghost"
             size="icon"
@@ -200,13 +251,13 @@ export default function Dashboard() {
             <ArrowRight />
           </Button>
 
-          <div >
+          <div>
             <span className="text-card-foreground mb-2">Draft Reports</span>
             <div className="flex items-end space-x-2">
               <span className="text-3xl font-bold">
                 {loadingCounts ? "..." : counts.draftReports}
               </span>
-              </div>
+            </div>
           </div>
         </Card>
       </div>

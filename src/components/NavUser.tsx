@@ -2,7 +2,6 @@
 
 import {
   BellIcon,
-  CreditCardIcon,
   LogOutIcon,
   MoreVerticalIcon,
   UserCircleIcon,
@@ -120,15 +119,11 @@ export default function NavUser() {
             <DropdownMenuGroup>
               <DropdownMenuItem>
                 <UserCircleIcon />
-                Account
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <CreditCardIcon />
-                Billing
+                Account Placeholder
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <BellIcon />
-                Notifications
+                Notifications Placeholder
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />

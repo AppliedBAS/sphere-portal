@@ -1,7 +1,7 @@
 import ProjectReportForm from "@/components/ProjectReportForm";
 import React from "react";
 
-const CreateProjectReportPage: React.FC = () => {
+const CreateProjectReport: React.FC = () => {
   return (
     <div>
       <header className="mb-6">
@@ -12,4 +12,4 @@ const CreateProjectReportPage: React.FC = () => {
   );
 };
 
-export default CreateProjectReportPage;
+export default CreateProjectReport;

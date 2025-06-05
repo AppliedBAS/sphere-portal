@@ -9,7 +9,6 @@ import {
   ClipboardCheck,
   FolderIcon,
   SettingsIcon,
-  HelpCircle,
   CreditCardIcon,
 } from "lucide-react";
 import {
@@ -54,11 +53,7 @@ const data = {
       url: "#",
       icon: SettingsIcon,
     },
-    {
-      title: "Help",
-      url: "#",
-      icon: HelpCircle, // Placeholder for help icon
-    },
+
   ],
   documents: [
     {

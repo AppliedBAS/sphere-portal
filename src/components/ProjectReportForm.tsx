@@ -16,6 +16,8 @@ import { ProjectReport, ProjectReportMessage } from "@/models/ProjectReport";
 import { toast } from "sonner";
 import { Project, ProjectHit } from "@/models/Project";
 import { getDoc } from "firebase/firestore";
+import { Textarea } from "./ui/textarea";
+import { Label } from "./ui/label";
 
 interface ProjectReportFormProps {
   projectReport?: ProjectReport;
@@ -173,17 +175,17 @@ export default function ProjectReportForm({ projectReport }: ProjectReportFormPr
   return (
     <form onSubmit={handleSubmit}>
       <div className="mt-4 flex flex-col gap-2">
-        <label htmlFor="projectId" className="text-sm">
+        <Label htmlFor="projectId" className="text-sm">
           Project
-        </label>
+        </Label>
         <ProjectSelect
           selectedProject={project}
           setSelectedProject={setProject}
         />
 
-        <label htmlFor="leadTechnician" className="text-sm">
+        <Label htmlFor="leadTechnician" className="text-sm">
           Lead Technician
-        </label>
+        </Label>
         <EmployeeSelect
           employees={technicians}
           loading={loadingEmployees}
@@ -197,9 +199,9 @@ export default function ProjectReportForm({ projectReport }: ProjectReportFormPr
           Leave blank if you are the lead technician.
         </p>
 
-        <label htmlFor="assignedTechnicians" className="text-sm">
+        <Label htmlFor="assignedTechnicians" className="text-sm">
           Assigned Technicians
-        </label>
+        </Label>
         <div className="flex flex-wrap gap-2">
           {assignedTechnicians.map((emp) => (
             <span
@@ -230,10 +232,10 @@ export default function ProjectReportForm({ projectReport }: ProjectReportFormPr
           placeholder="Add Technician..."
         />
 
-        <label htmlFor="notes" className="text-sm">
+        <Label htmlFor="notes" className="text-sm">
           Notes
-        </label>
-        <textarea
+        </Label>
+        <Textarea
           id="notes"
           name="notes"
           value={notes}
@@ -243,10 +245,10 @@ export default function ProjectReportForm({ projectReport }: ProjectReportFormPr
           placeholder="Enter notes here"
         />
 
-        <label htmlFor="additionalMaterials" className="text-sm">
+        <Label htmlFor="additionalMaterials" className="text-sm">
           Additional Materials
-        </label>
-        <textarea
+        </Label>
+        <Textarea
           id="additionalMaterials"
           name="additionalMaterials"
           value={additionalMaterials}
