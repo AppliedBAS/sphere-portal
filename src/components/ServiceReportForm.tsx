@@ -460,7 +460,6 @@ export default function ServiceReportForm({
                           date ? date.toISOString().substring(0, 10) : ""
                         );
                       }}
-                      initialFocus
                     />
                   </PopoverContent>
                 </Popover>
