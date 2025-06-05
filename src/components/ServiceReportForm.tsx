@@ -1,20 +1,39 @@
 "use client";
 
-import { useAuth } from "@/contexts/AuthContext";
+// import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect, FormEvent } from "react";
 import EmployeeSelect from "@/components/EmployeeSelect";
 import { Employee as EmployeeModel } from "@/models/Employee";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useEmployees } from "@/hooks/useEmployees";
-import { ServiceReport, ServiceNote } from "@/models/ServiceReport";
-import { getEmployeeByEmail, sendServiceReportEmail } from "@/lib/services";
-import { toast } from "sonner";
-import { getDoc, Timestamp } from "firebase/firestore";
+import { ServiceReport } from "@/models/ServiceReport";
+import { getDoc } from "firebase/firestore";
 import ClientSelect from "./ClientSelect";
+import { Building, ClientHit } from "@/models/Client";
+import { toast } from "sonner";
+import TimeSelect from "@/components/TimeSelect";
+import { Switch } from "@/components/ui/switch";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { format, parseISO } from "date-fns";
+
+// ShadCN Select imports:
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+  SelectGroup,
+  SelectLabel,
+} from "@/components/ui/select";
 
 interface ServiceReportFormProps {
   serviceReport?: ServiceReport;
@@ -26,12 +45,14 @@ interface ServiceNoteInput {
   technicianOvertime: string;
   helperTime: string;
   helperOvertime: string;
-  remoteWork: string;
+  remoteWork: string; // 'yes' or ''
   notes: string;
 }
 
-export default function ServiceReportForm({ serviceReport }: ServiceReportFormProps) {
-  const { user } = useAuth();
+export default function ServiceReportForm({
+  serviceReport,
+}: ServiceReportFormProps) {
+  // const { user } = useAuth();
 
   const {
     technicians,
@@ -42,26 +63,41 @@ export default function ServiceReportForm({ serviceReport }: ServiceReportFormPr
 
   const [submitting, setSubmitting] = useState<boolean>(false);
 
-  // If editing, prefill the author technician
-  const [authorTechnician, setAuthorTechnician] = useState<EmployeeModel | null>(null);
+  // If editing, prefill the assigned technician
+  const [assignedTechnician, setAssignedTechnician] =
+    useState<EmployeeModel | null>(null);
 
-  // Controlled inputs for basic service-report fields:
-  const [clientName, setClientName] = useState<string>(serviceReport?.clientName || "");
-  const [contactName, setContactName] = useState<string>(serviceReport?.contactName || "");
-  const [contactEmail, setContactEmail] = useState<string>(serviceReport?.contactEmail || "");
-  const [contactPhone, setContactPhone] = useState<string>(serviceReport?.contactPhone || "");
-  const [serviceAddress1, setServiceAddress1] = useState<string>(serviceReport?.serviceAddress1 || "");
-  const [serviceAddress2, setServiceAddress2] = useState<string>(serviceReport?.serviceAddress2 || "");
-  const [cityStateZip, setCityStateZip] = useState<string>(serviceReport?.cityStateZip || "");
-  const [printedName, setPrintedName] = useState<string>(serviceReport?.printedName || "");
-  const [materialNotes, setMaterialNotes] = useState<string>(serviceReport?.materialNotes || "");
-  const [dateSigned, setDateSigned] = useState<string>(
-    serviceReport?.dateSigned ? serviceReport.dateSigned.toDate().toISOString().substring(0, 10) : ""
+  // The chosen client (from ClientSelect)
+  const [client, setClient] = useState<ClientHit | null>(null);
+
+  // The chosen building (we’ll identify by serviceAddress1)
+  const [building, setBuilding] = useState<Building | null>(null);
+  const [contactName, setContactName] = useState<string>(
+    serviceReport?.contactName || ""
   );
-  const [draft, setDraft] = useState<boolean>(serviceReport?.draft ?? true);
+  const [contactEmail, setContactEmail] = useState<string>(
+    serviceReport?.contactEmail || ""
+  );
+  const [contactPhone, setContactPhone] = useState<string>(
+    serviceReport?.contactPhone || ""
+  );
+  const [serviceAddress1, setServiceAddress1] = useState<string>(
+    serviceReport?.serviceAddress1 || ""
+  );
+  const [serviceAddress2, setServiceAddress2] = useState<string>(
+    serviceReport?.serviceAddress2 || ""
+  );
+  const [cityStateZip, setCityStateZip] = useState<string>(
+    serviceReport?.cityStateZip || ""
+  );
+  const [materialNotes, setMaterialNotes] = useState<string>(
+    serviceReport?.materialNotes || ""
+  );
 
-  // Controlled state for a list of service-note entries
-  const [serviceNotesInputs, setServiceNotesInputs] = useState<ServiceNoteInput[]>(
+  // Controlled list of service‐note entries
+  const [serviceNotesInputs, setServiceNotesInputs] = useState<
+    ServiceNoteInput[]
+  >(
     serviceReport?.serviceNotes.map((sn) => ({
       date: sn.date.toDate().toISOString().substring(0, 10),
       technicianTime: sn.technicianTime,
@@ -83,16 +119,17 @@ export default function ServiceReportForm({ serviceReport }: ServiceReportFormPr
     ]
   );
 
-  // If editing an existing report, load its author technician
+  // If editing an existing report, load its author technician (and any pre‐saved client fields)
   useEffect(() => {
     async function initForm() {
       if (!serviceReport) return;
 
+      // Populate assignedTechnician from a DocumentReference, if present
       if (serviceReport.authorTechnicianRef) {
         const empSnap = await getDoc(serviceReport.authorTechnicianRef);
         if (empSnap.exists()) {
           const data = empSnap.data();
-          setAuthorTechnician({
+          setAssignedTechnician({
             id: empSnap.id,
             clientId: data["client-id"],
             clientSecret: data["client-secret"],
@@ -101,6 +138,29 @@ export default function ServiceReportForm({ serviceReport }: ServiceReportFormPr
             ...data,
           } as EmployeeModel);
         }
+      }
+
+      // If there was already a saved client/building on the report, populate those fields:
+      // if (serviceReport.clientName) {
+      //   setClientName(serviceReport.clientName);
+      // }
+      if (serviceReport.contactName) {
+        setContactName(serviceReport.contactName);
+      }
+      if (serviceReport.contactEmail) {
+        setContactEmail(serviceReport.contactEmail);
+      }
+      if (serviceReport.contactPhone) {
+        setContactPhone(serviceReport.contactPhone);
+      }
+      if (serviceReport.serviceAddress1) {
+        setServiceAddress1(serviceReport.serviceAddress1);
+      }
+      if (serviceReport.serviceAddress2) {
+        setServiceAddress2(serviceReport.serviceAddress2);
+      }
+      if (serviceReport.cityStateZip) {
+        setCityStateZip(serviceReport.cityStateZip);
       }
     }
     initForm();
@@ -145,92 +205,15 @@ export default function ServiceReportForm({ serviceReport }: ServiceReportFormPr
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-
-    try {
-      // Determine the author technician
-      let technician: EmployeeModel;
-      if (authorTechnician) {
-        technician = authorTechnician;
-      } else {
-        technician = await getEmployeeByEmail(user!.email!);
-      }
-
-      // Build the ServiceNote[] from inputs
-      const serviceNotes: ServiceNote[] = serviceNotesInputs.map((input) => ({
-        date: input.date ? Timestamp.fromDate(new Date(input.date)) : Timestamp.now(),
-        technicianTime: input.technicianTime,
-        technicianOvertime: input.technicianOvertime,
-        helperTime: input.helperTime,
-        helperOvertime: input.helperOvertime,
-        remoteWork: input.remoteWork,
-        serviceNotes: input.notes,
-      }));
-
-      const newServiceReport: ServiceReport = {
-        id: serviceReport?.id || "",
-        authorTechnicianRef: technician.docRef, // assume EmployeeModel has docRef
-        clientName,
-        contactName,
-        contactEmail,
-        contactPhone,
-        serviceAddress1,
-        serviceAddress2,
-        cityStateZip,
-        printedName,
-        materialNotes,
-        createdAt: serviceReport?.createdAt || Timestamp.now(),
-        dateSigned: dateSigned ? Timestamp.fromDate(new Date(dateSigned)) : undefined,
-        draft,
-        serviceNotes,
-      };
-
-      // Send or save the service report
-      const response: Response = await sendServiceReportEmail(newServiceReport, technician);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to send/save service report: ${errorText}`);
-      }
-
-      // Reset form if creating new
-      if (!serviceReport) {
-        setAuthorTechnician(null);
-        setClientName("");
-        setContactName("");
-        setContactEmail("");
-        setContactPhone("");
-        setServiceAddress1("");
-        setServiceAddress2("");
-        setCityStateZip("");
-        setPrintedName("");
-        setMaterialNotes("");
-        setDateSigned("");
-        setDraft(true);
-        setServiceNotesInputs([
-          {
-            date: "",
-            technicianTime: "",
-            technicianOvertime: "",
-            helperTime: "",
-            helperOvertime: "",
-            remoteWork: "",
-            notes: "",
-          },
-        ]);
-      }
-
-      toast.success("Service report submitted successfully!");
-    } catch (error) {
-      console.error("Error generating service report:", error);
-      toast.error(`${error instanceof Error ? error.message : "Unknown error"}`);
-    } finally {
-      setSubmitting(false);
-    }
+    toast.success("Tested submission");
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    setSubmitting(false);
   };
 
   return (
     <form onSubmit={handleSubmit}>
       <div className="mt-4 flex flex-col gap-6">
+        {/* === Assigned Technician === */}
         <div className="flex flex-col space-y-2">
           <Label htmlFor="authorTechnician">Assigned Technician</Label>
           <EmployeeSelect
@@ -238,8 +221,8 @@ export default function ServiceReportForm({ serviceReport }: ServiceReportFormPr
             loading={loadingEmployees}
             error={employeesError}
             refetch={refetchEmployees}
-            selectedEmployee={authorTechnician}
-            setSelectedEmployee={setAuthorTechnician}
+            selectedEmployee={assignedTechnician}
+            setSelectedEmployee={setAssignedTechnician}
             placeholder="Select Technician..."
           />
           <p className="text-xs text-muted-foreground mt-1">
@@ -247,48 +230,179 @@ export default function ServiceReportForm({ serviceReport }: ServiceReportFormPr
           </p>
         </div>
 
+        {/* === Client Select === */}
         <div className="flex flex-col space-y-2">
-          <Label htmlFor="clientName">Client Select</Label>
+          <Label htmlFor="clientSelect">Client Select *</Label>
           <ClientSelect
-            selectedClient={clientName ? { clientName } : null}
-            
-            />
-        </div>
+            selectedClient={client}
+            setSelectedClient={(selected) => {
+              setClient(selected || null);
 
-        <div className="flex flex-col space-y-2">
-          <Label htmlFor="serviceAddress1">Service Address 1</Label>
-          <Input
-            id="serviceAddress1"
-            value={serviceAddress1}
-            onChange={(e) => setServiceAddress1(e.target.value)}
-            placeholder="Address line 1"
-            required
+              // if (selected) {
+              //   // Immediately populate clientName from the selected ClientHit
+              //   setClientName(selected.clientName);
+              // } else {
+              //   setClientName("");
+              // }
+
+              // Clear any previously selected building and all its dependent fields:
+              setBuilding(null);
+              setContactName("");
+              setContactEmail("");
+              setContactPhone("");
+              setServiceAddress1("");
+              setServiceAddress2("");
+              setCityStateZip("");
+            }}
           />
         </div>
 
-        <div className="flex flex-col space-y-2">
-          <Label htmlFor="serviceAddress2">Service Address 2</Label>
-          <Input
-            id="serviceAddress2"
-            value={serviceAddress2}
-            onChange={(e) => setServiceAddress2(e.target.value)}
-            placeholder="Address line 2 (optional)"
-          />
-        </div>
+        {/* === Building Select (ShadCN) – only if client chosen === */}
+        {client && (
+          <div className="flex flex-col space-y-2">
+            <Label htmlFor="buildingSelect">Building Select</Label>
+            {client.buildings && client.buildings.length > 0 ? (
+              <Select
+                value={building ? building.serviceAddress1 : ""}
+                onValueChange={(val) => {
+                  if (val === "__create__") {
+                    toast.info("Create Building dialog not implemented");
+                    return;
+                  }
+                  if (val === "") {
+                    setBuilding(null);
+                    setContactName("");
+                    setContactEmail("");
+                    setContactPhone("");
+                    setServiceAddress1("");
+                    setServiceAddress2("");
+                    setCityStateZip("");
+                    return;
+                  }
 
-        <div className="flex flex-col space-y-2">
-          <Label htmlFor="cityStateZip">City, State, ZIP</Label>
-          <Input
-            id="cityStateZip"
-            value={cityStateZip}
-            onChange={(e) => setCityStateZip(e.target.value)}
-            placeholder="e.g., Dallas, TX 75054"
-            required
-          />
-        </div>
+                  const found = client.buildings.find(
+                    (bld) => bld.serviceAddress1 === val
+                  );
 
+                  if (found) {
+                    console.log("Selected building:", found);
+                    setBuilding(found);
+                    setContactName(found.contactName ?? "");
+                    setContactEmail(found.contactEmail ?? "");
+                    setContactPhone(found.contactPhone ?? "");
+                    setServiceAddress1(found.serviceAddress1 ?? "");
+                    setServiceAddress2(found.serviceAddress2 ?? "");
+                    setCityStateZip(found.cityStateZip ?? "");
+                  }
+                }}
+              >
+                <SelectTrigger id="buildingSelect">
+                  <SelectValue placeholder="Select a building..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Buildings</SelectLabel>
+                    {client.buildings.map((bld) => (
+                      <SelectItem
+                        key={bld.serviceAddress1}
+                        value={bld.serviceAddress1}
+                        className="py-2"
+                      >
+                        {bld.serviceAddress1}
+                      </SelectItem>
+                    ))}
+                    <SelectItem
+                      value="__create__"
+                      className="text-card-foreground font-semibold py-4"
+                    >
+                      + Create Building
+                    </SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <div className="text-muted-foreground text-sm">
+                  No buildings found.
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() =>
+                    toast.info("Create Building dialog not implemented")
+                  }
+                  className="w-fit"
+                >
+                  + Create Building
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* === Populate Contact & Address as Read‐Only Inputs === */}
+        {building && (
+          <>
+            <div className="flex flex-col space-y-2">
+              <Label htmlFor="contactName">Contact Name</Label>
+              <Input
+                id="contactName"
+                value={contactName}
+                readOnly
+                placeholder="Contact Name"
+              />
+            </div>
+            <div className="flex flex-col space-y-2">
+              <Label htmlFor="contactEmail">Contact Email</Label>
+              <Input
+                id="contactEmail"
+                value={contactEmail}
+                readOnly
+                placeholder="Contact Email"
+              />
+            </div>
+            <div className="flex flex-col space-y-2">
+              <Label htmlFor="contactPhone">Contact Phone</Label>
+              <Input
+                id="contactPhone"
+                value={contactPhone}
+                readOnly
+                placeholder="Contact Phone"
+              />
+            </div>
+            <div className="flex flex-col space-y-2">
+              <Label htmlFor="serviceAddress1">Service Address 1</Label>
+              <Input
+                id="serviceAddress1"
+                value={serviceAddress1}
+                readOnly
+                placeholder="Address Line 1"
+              />
+            </div>
+            <div className="flex flex-col space-y-2">
+              <Label htmlFor="serviceAddress2">Service Address 2</Label>
+              <Input
+                id="serviceAddress2"
+                value={serviceAddress2}
+                readOnly
+                placeholder="Address Line 2"
+              />
+            </div>
+            <div className="flex flex-col space-y-2">
+              <Label htmlFor="cityStateZip">City, State, ZIP</Label>
+              <Input
+                id="cityStateZip"
+                value={cityStateZip}
+                readOnly
+                placeholder="City, State ZIP"
+              />
+            </div>
+          </>
+        )}
+
+        {/* === Material Notes === */}
         <div className="flex flex-col space-y-2">
-          <Label htmlFor="additionalMaterialNotes">Additional Materials</Label>
+          <Label htmlFor="materialNotes">Additional Materials</Label>
           <Textarea
             id="materialNotes"
             value={materialNotes}
@@ -298,6 +412,7 @@ export default function ServiceReportForm({ serviceReport }: ServiceReportFormPr
           />
         </div>
 
+        {/* === Service Notes === */}
         <div className="mt-6">
           <span className="text-sm font-medium">Service Notes</span>
           {serviceNotesInputs.map((note, idx) => (
@@ -317,79 +432,134 @@ export default function ServiceReportForm({ serviceReport }: ServiceReportFormPr
               </div>
 
               <div>
-                <Label htmlFor={`noteDate_${idx}`}>Date</Label>
-                <Input
-                  id={`noteDate_${idx}`}
-                  type="date"
-                  value={note.date}
-                  onChange={(e) => handleServiceNoteChange(idx, "date", e.target.value)}
-                  required
-                />
+                <Label htmlFor={`noteDate_${idx}`} className="mb-2 block">
+                  Date
+                </Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={note.date ? "outline" : "secondary"}
+                      className={
+                        "w-full justify-start text-left font-normal " +
+                        (!note.date ? "text-muted-foreground" : "")
+                      }
+                    >
+                      {note.date
+                        ? format(parseISO(note.date), "PPP")
+                        : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={note.date ? parseISO(note.date) : undefined}
+                      onSelect={(date) => {
+                        handleServiceNoteChange(
+                          idx,
+                          "date",
+                          date ? date.toISOString().substring(0, 10) : ""
+                        );
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
 
-              <div>
-                <Label htmlFor={`technicianTime_${idx}`}>Technician Time</Label>
-                <Input
-                  id={`technicianTime_${idx}`}
-                  value={note.technicianTime}
-                  onChange={(e) =>
-                    handleServiceNoteChange(idx, "technicianTime", e.target.value)
-                  }
-                  placeholder="e.g., 3.0"
-                  required
-                />
+              {/* Time fields: Technician and Helper on separate rows */}
+              <div className="flex flex-col gap-2 md:gap-4">
+                {/* Technician Time */}
+                <div className="flex flex-col md:flex-row md:gap-4 space-y-4">
+                  <div className="flex flex-col">
+                    <Label
+                      htmlFor={`technicianTime_${idx}`}
+                      className="mb-2 block"
+                    >
+                      Technician Time
+                    </Label>
+                    <TimeSelect
+                      selectedTime={note.technicianTime}
+                      setSelectedTime={(val: string) =>
+                        handleServiceNoteChange(idx, "technicianTime", val)
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <Label
+                      htmlFor={`technicianOvertime_${idx}`}
+                      className="mb-2 block"
+                    >
+                      Technician Overtime
+                    </Label>
+                    <TimeSelect
+                      selectedTime={note.technicianOvertime}
+                      setSelectedTime={(val: string) =>
+                        handleServiceNoteChange(idx, "technicianOvertime", val)
+                      }
+                    />
+                  </div>
+                </div>
+                {/* Helper Time */}
+                <div className="flex flex-col md:flex-row md:gap-4 space-y-4">
+                  <div className="flex flex-col">
+                    <Label htmlFor={`helperTime_${idx}`} className="mb-2 block">
+                      Helper Time
+                    </Label>
+                    <TimeSelect
+                      selectedTime={note.helperTime}
+                      setSelectedTime={(val: string) =>
+                        handleServiceNoteChange(idx, "helperTime", val)
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <Label
+                      htmlFor={`helperOvertime_${idx}`}
+                      className="mb-2 block"
+                    >
+                      Helper Overtime
+                    </Label>
+                    <TimeSelect
+                      selectedTime={note.helperOvertime}
+                      setSelectedTime={(val: string) =>
+                        handleServiceNoteChange(idx, "helperOvertime", val)
+                      }
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <Label htmlFor={`technicianOvertime_${idx}`}>Technician Overtime</Label>
-                <Input
-                  id={`technicianOvertime_${idx}`}
-                  value={note.technicianOvertime}
-                  onChange={(e) =>
-                    handleServiceNoteChange(idx, "technicianOvertime", e.target.value)
-                  }
-                  placeholder="e.g., 1.0"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor={`helperTime_${idx}`}>Helper Time</Label>
-                <Input
-                  id={`helperTime_${idx}`}
-                  value={note.helperTime}
-                  onChange={(e) => handleServiceNoteChange(idx, "helperTime", e.target.value)}
-                  placeholder="e.g., 2.0"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor={`helperOvertime_${idx}`}>Helper Overtime</Label>
-                <Input
-                  id={`helperOvertime_${idx}`}
-                  value={note.helperOvertime}
-                  onChange={(e) =>
-                    handleServiceNoteChange(idx, "helperOvertime", e.target.value)
-                  }
-                  placeholder="e.g., 0.5"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor={`remoteWork_${idx}`}>Remote Work</Label>
-                <Input
+              {/* Remove the old Remote Work input and add a Switch */}
+              <div className="flex items-center gap-2">
+                <Label htmlFor={`remoteWork_${idx}`} className="mb-1">
+                  Remote Work
+                </Label>
+                <Switch
                   id={`remoteWork_${idx}`}
-                  value={note.remoteWork}
-                  onChange={(e) => handleServiceNoteChange(idx, "remoteWork", e.target.value)}
-                  placeholder="e.g., Remote diagnostics"
+                  checked={note.remoteWork === "yes"}
+                  onCheckedChange={(checked: boolean) =>
+                    handleServiceNoteChange(
+                      idx,
+                      "remoteWork",
+                      checked ? "yes" : ""
+                    )
+                  }
                 />
+                <span className="ml-2 text-sm">
+                  {note.remoteWork === "yes" ? "Yes" : "No"}
+                </span>
               </div>
 
               <div>
-                <Label htmlFor={`notes_${idx}`}>Service Notes</Label>
+                <Label htmlFor={`notes_${idx}`} className="mb-2 block">
+                  Service Notes
+                </Label>
                 <Textarea
                   id={`notes_${idx}`}
                   value={note.notes}
-                  onChange={(e) => handleServiceNoteChange(idx, "notes", e.target.value)}
+                  onChange={(e) =>
+                    handleServiceNoteChange(idx, "notes", e.target.value)
+                  }
                   rows={3}
                   placeholder="Describe work performed"
                   required
@@ -398,23 +568,40 @@ export default function ServiceReportForm({ serviceReport }: ServiceReportFormPr
             </div>
           ))}
 
-          <Button type="button" variant="secondary" className="mt-4" onClick={handleAddServiceNote}>
+          <Button
+            type="button"
+            variant="secondary"
+            className="mt-4"
+            onClick={handleAddServiceNote}
+          >
             Add a Service Note
           </Button>
         </div>
 
-        <Button
-          type="submit"
-          disabled={submitting || loadingEmployees || !clientName || !contactName || !serviceAddress1}
-          variant="default"
-          className="mt-8 w-full"
-        >
-          {submitting
-            ? "Submitting..."
-            : serviceReport
-            ? "Update Service Report"
-            : "Submit Service Report"}
-        </Button>
+        {/* === Save/Submit Buttons === */}
+        <div className="mt-8 flex gap-4 mb-8">
+          <Button
+            type="button"
+            disabled={submitting}
+            variant="outline"
+            onClick={() => {
+              // Implement save‐draft logic
+              toast.info("Saved as draft (not implemented)");
+            }}
+          >
+            Save
+          </Button>
+          <Button
+            type="submit"
+            disabled={submitting || !client}
+            variant="default"
+            onClick={() => {
+              toast.info("Submitted service report (not implemented)");
+            }}
+          >
+            Submit
+          </Button>
+        </div>
       </div>
     </form>
   );

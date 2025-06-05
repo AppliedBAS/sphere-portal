@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@/contexts/AuthContext";
+// import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect, FormEvent } from "react";
 import EmployeeSelect from "./EmployeeSelect";
 import { Employee as EmployeeModel } from "@/models/Employee";
@@ -8,11 +8,11 @@ import ProjectSelect from "./ProjectSelect";
 import { Button } from "./ui/button";
 import { useEmployees } from "@/hooks/useEmployees";
 import {
-  getEmployeeByEmail,
+  // getEmployeeByEmail,
   getProjectById,
-  sendProjectReportEmail,
+  // sendProjectReportEmail,
 } from "@/lib/services";
-import { ProjectReport, ProjectReportMessage } from "@/models/ProjectReport";
+import { ProjectReport } from "@/models/ProjectReport";
 import { toast } from "sonner";
 import { Project, ProjectHit } from "@/models/Project";
 import { getDoc } from "firebase/firestore";
@@ -23,8 +23,9 @@ interface ProjectReportFormProps {
   projectReport?: ProjectReport;
 }
 
-export default function ProjectReportForm({ projectReport }: ProjectReportFormProps) {
-  const { user } = useAuth();
+export default function ProjectReportForm({
+  projectReport,
+}: ProjectReportFormProps) {
 
   const {
     technicians,
@@ -36,7 +37,9 @@ export default function ProjectReportForm({ projectReport }: ProjectReportFormPr
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [leadEmployee, setLeadEmployee] = useState<EmployeeModel | null>(null);
   const [project, setProject] = useState<ProjectHit | null>(null);
-  const [assignedTechnicians, setAssignedTechnicians] = useState<EmployeeModel[]>([]);
+  const [assignedTechnicians, setAssignedTechnicians] = useState<
+    EmployeeModel[]
+  >([]);
 
   // Controlled state for the two textareas:
   const [notes, setNotes] = useState<string>(projectReport?.notes || "");
@@ -117,64 +120,68 @@ export default function ProjectReportForm({ projectReport }: ProjectReportFormPr
     e.preventDefault();
     setSubmitting(true);
 
-    try {
-      if (!project) {
-        throw new Error("Project is required");
-      }
+    // try {
+    //   if (!project) {
+    //     throw new Error("Project is required");
+    //   }
 
-      let employee: EmployeeModel;
-      if (leadEmployee) {
-        employee = leadEmployee;
-      } else {
-        employee = await getEmployeeByEmail(user!.email!);
-      }
+    //   let employee: EmployeeModel;
+    //   if (leadEmployee) {
+    //     employee = leadEmployee;
+    //   } else {
+    //     employee = await getEmployeeByEmail(user!.email!);
+    //   }
 
-      const projectReportMessage: ProjectReportMessage = {
-        technician_name: employee.name,
-        technician_phone: employee.phone,
-        technician_email: employee.email,
-        location: project.location,
-        description: project.description,
-        project_id: project.docId,
-        doc_id: 1, // Assuming doc_id is always 1 for the first report
-        project_subtitle: `PR ${project.docId} - 1 - ${project.location} - ${project.description}`,
-        date: new Date().toLocaleDateString("en-US", {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        }),
-        client_name: project.client,
-        materials: additionalMaterials || "None",
-        notes: notes || "None",
-      };
+    //   const projectReportMessage: ProjectReportMessage = {
+    //     technician_name: employee.name,
+    //     technician_phone: employee.phone,
+    //     technician_email: employee.email,
+    //     location: project.location,
+    //     description: project.description,
+    //     project_id: project.docId,
+    //     doc_id: 1, // Assuming doc_id is always 1 for the first report
+    //     project_subtitle: `PR ${project.docId} - 1 - ${project.location} - ${project.description}`,
+    //     date: new Date().toLocaleDateString("en-US", {
+    //       year: "numeric",
+    //       month: "long",
+    //       day: "numeric",
+    //     }),
+    //     client_name: project.client,
+    //     materials: additionalMaterials || "None",
+    //     notes: notes || "None",
+    //   };
 
-      const response: Response = await sendProjectReportEmail(
-        projectReportMessage,
-        employee
-      );
+    //   const response: Response = await sendProjectReportEmail(
+    //     projectReportMessage,
+    //     employee
+    //   );
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to send email: ${errorText}`);
-      }
+    //   if (!response.ok) {
+    //     const errorText = await response.text();
+    //     throw new Error(`Failed to send email: ${errorText}`);
+    //   }
 
-      setProject(null);
-      setLeadEmployee(null);
-      setAssignedTechnicians([]);
-      setNotes("");
-      setAdditionalMaterials("");
-      toast.success("Report submitted successfully!");
-    } catch (error) {
-      console.error("Error generating report:", error);
-      toast.error(`${error instanceof Error ? error.message : "Unknown error"}`);
-    } finally {
-      setSubmitting(false);
-    }
+    //   setProject(null);
+    //   setLeadEmployee(null);
+    //   setAssignedTechnicians([]);
+    //   setNotes("");
+    //   setAdditionalMaterials("");
+    //   toast.success("Report submitted successfully!");
+    // } catch (error) {
+    //   console.error("Error generating report:", error);
+    //   toast.error(
+    //     `${error instanceof Error ? error.message : "Unknown error"}`
+    //   );
+    // } finally {
+    //   setSubmitting(false);
+    // }
+    toast.success("Report submitted successfully! (not implemented)");
+    setSubmitting(false);
   };
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="mt-4 flex flex-col gap-2">
+      <div className="mt-4 flex flex-col gap-2 mb-8">
         <Label htmlFor="projectId" className="text-sm">
           Project
         </Label>
@@ -257,15 +264,27 @@ export default function ProjectReportForm({ projectReport }: ProjectReportFormPr
           className="block w-full border rounded px-2 py-1 mt-1 text-sm"
           placeholder="Optional materials used"
         />
+        <div className="mt-8 flex gap-4 mb-8 justify-baseline items-center">
+          <Button
+            type="button"
+            disabled={false}
+            variant="outline"
+            className=""
+            onClick={() => {
+              toast.info("Saved as draft (not implemented)");
+            }}
+          >
+            Save
+          </Button>
 
-        <Button
-          type="submit"
-          disabled={submitting || loadingEmployees || !project}
-          variant="default"
-          className="mt-4 md:max-w-52 w-full"
-        >
-          {submitting ? "Submitting..." : "Submit"}
-        </Button>
+          <Button
+            type="submit"
+            disabled={true}
+            variant="default"
+          >
+            {submitting ? "Submitting..." : "Submit"}
+          </Button>
+        </div>
       </div>
     </form>
   );

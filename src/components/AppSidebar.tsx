@@ -38,12 +38,12 @@ const data = {
     },
     {
       title: "Projects",
-      url: "dashboard/projects",
+      url: "/dashboard/projects",
       icon: FolderIcon,
     },
     {
       title: "Clients",
-      url: "dashboard/clients",
+      url: "/dashboard/clients",
       icon: Users,
     },
   ],
@@ -84,7 +84,7 @@ export function AppSidebar() {
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
-              <a href="#">
+              <a href="/dashboard" className="flex items-center space-x-2">
                 <ArrowUpCircleIcon className="h-5 w-5" />
                 <span className="text-base font-semibold">Sphere Portal</span>
               </a>

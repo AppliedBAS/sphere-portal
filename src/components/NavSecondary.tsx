@@ -30,7 +30,7 @@ export default function NavSecondary({ items }: { items: Item[] }) {
           {items.map((item) => (
             <SidebarMenuItem key={item.title}>
               <SidebarMenuButton asChild>
-                <a href={item.url}>
+                <a href={item.url} className="flex items-center space-x-2">
                   {item.icon && <item.icon />}
                   <span>{item.title}</span>
                 </a>
@@ -39,7 +39,7 @@ export default function NavSecondary({ items }: { items: Item[] }) {
           ))}
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <div className="flex items-center gap-2 cursor-pointer" onClick={toggleTheme}>
+              <div className="flex items-center gap-2 cursor-pointer space-x-2" onClick={toggleTheme}>
                 <SunMoonIcon className="h-5 w-5" />
                 <span>Toggle Theme</span>
               </div>

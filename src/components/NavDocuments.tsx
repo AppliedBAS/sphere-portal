@@ -17,7 +17,7 @@ export default function NavDocuments({ items }: { items: Item[] }) {
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <Link href={item.url}>
+                    <Link href={item.url} className="flex items-center space-x-2">
                       {item.icon && <item.icon />}
                       <span>{item.title}</span>
                     </Link>

@@ -42,7 +42,7 @@ export default function NavMain({ items }: { items: Item[] }) {
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   tooltip="Quick Create"
-                  className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
+                  className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground space-x-2"
                 >
                   <PlusIcon />
                   <span>Quick Create</span>
@@ -57,23 +57,23 @@ export default function NavMain({ items }: { items: Item[] }) {
                 <DropdownMenuLabel>Quick Create</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                  <DropdownMenuItem>
-                    <a href="/dashboard/service-reports/create" className="flex items-center w-full">
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/service-reports/create" className="flex items-center w-full">
                       <ClipboardCheck className="mr-4" />
                       <span>Service Reports</span>
-                    </a>
+                    </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <a href="/dashboard/project-reports/create" className="flex items-center w-full">
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/project-reports/create" className="flex items-center w-full">
                       <FileBarChart2 className="mr-4" />
                       <span>Project Reports</span>
-                    </a>
+                    </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <a href="/dashboard/purchase-orders/create" className="flex items-center w-full">
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/purchase-orders/create" className="flex items-center w-full">
                       <CreditCardIcon className="mr-4" />
                       <span>Purchase Orders</span>
-                    </a>
+                    </Link>
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
               </DropdownMenuContent>

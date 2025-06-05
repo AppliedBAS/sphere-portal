@@ -262,13 +262,13 @@ export default function ProjectReports() {
                   <DropdownMenuContent align="end">
                     {report.draft && (
                       <DropdownMenuItem asChild>
-                        <Link href={`/project-reports/${report.id}/edit`}>
+                        <Link href={`/dashboard/project-reports/${report.id}/edit`}>
                           Edit
                         </Link>
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuItem asChild>
-                      <Link href={`/project-reports/${report.id}`}>
+                      <Link href={`/dashboard/project-reports/${report.id}`}>
                         View
                       </Link>
                     </DropdownMenuItem>

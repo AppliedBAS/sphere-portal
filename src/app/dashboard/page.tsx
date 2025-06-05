@@ -159,7 +159,7 @@ export default function Dashboard() {
       </div>
 
       {/* 2. Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Project Reports Card */}
         <Card className="relative p-6 flex flex-col">
           <Button

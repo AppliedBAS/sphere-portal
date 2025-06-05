@@ -294,11 +294,11 @@ export default function ServiceReports() {
                   <DropdownMenuContent align="end">
                     {report.draft && (
                       <DropdownMenuItem asChild>
-                        <Link href={`/service-reports/${report.id}/edit`}>Edit</Link>
+                        <Link href={`/dashboard/service-reports/${report.id}/edit`}>Edit</Link>
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuItem asChild>
-                      <Link href={`/service-reports/${report.id}`}>View</Link>
+                      <Link href={`/dashboard/service-reports/${report.id}`}>View</Link>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
