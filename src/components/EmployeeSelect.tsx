@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { ChevronsUpDown } from "lucide-react";
 import {
   Popover,
   PopoverTrigger,
@@ -102,7 +102,7 @@ export default function EmployeeSelect({
                     }}
                   >
                     <div className="flex flex-col">
-                      <span className="font-semibold">{emp.name}</span>
+                      <span className="">{emp.name}</span>
                       <span className="text-sm text-muted-foreground">
                         {emp.email}
                       </span>
@@ -117,7 +117,7 @@ export default function EmployeeSelect({
                   setQuery("");
                 }}
               >
-                <Check className="mr-2" />
+                <ChevronsUpDown className="mr-2 rotate-180" />
                 Clear Selection
               </CommandItem>
             </CommandGroup>

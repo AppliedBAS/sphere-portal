@@ -38,7 +38,7 @@ export default function ServiceReports() {
   // --- Table state ---
   const [searchTerm, setSearchTerm] = useState("");
   const [sortColumn, setSortColumn] = useState<
-    "clientName" | "serviceAddress" | "createdAt"
+    "clientName" | "serviceAddress" | "createdAt" | "docId"
   >("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [pageIndex, setPageIndex] = useState(0);
@@ -67,6 +67,7 @@ export default function ServiceReports() {
           contactPhone: raw["contact-phone"] as string,
           contactName: raw["contact-name"] as string,
           createdAt: raw["created-at"] as Timestamp,
+          docId: raw["doc-id"] as number,
           dateSigned: raw["date-signed"] as Timestamp | undefined,
           draft: raw["draft"] as boolean,
           materialNotes: raw["material-notes"] as string,
@@ -125,6 +126,9 @@ export default function ServiceReports() {
       } else if (sortColumn === "serviceAddress") {
         aVal = a.serviceAddress1.toLowerCase();
         bVal = b.serviceAddress1.toLowerCase();
+      } else if (sortColumn === "docId") {
+        aVal = a.docId;
+        bVal = b.docId;
       } else {
         // createdAt
         aVal = a.createdAt.toMillis();
@@ -158,7 +162,7 @@ export default function ServiceReports() {
   // Helper to format Firestore Timestamp
   const formatDate = (ts: Timestamp) => ts.toDate().toLocaleString();
 
-  const toggleSort = (column: "clientName" | "serviceAddress" | "createdAt") => {
+  const toggleSort = (column: "clientName" | "serviceAddress" | "createdAt" | "docId") => {
     if (sortColumn === column) {
       setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
     } else {
@@ -203,6 +207,20 @@ export default function ServiceReports() {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead
+              className="w-20 cursor-pointer"
+              onClick={() => toggleSort("docId")}
+            >
+              <div className="flex items-center">
+                Doc&nbsp;ID
+                {sortColumn === "docId" &&
+                  (sortDirection === "asc" ? (
+                    <ChevronUp className="h-4 w-4 ml-1" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 ml-1" />
+                  ))}
+              </div>
+            </TableHead>
             <TableHead
               className="cursor-pointer"
               onClick={() => toggleSort("clientName")}
@@ -253,7 +271,8 @@ export default function ServiceReports() {
 
         <TableBody>
           {paginated.map((report) => (
-            <TableRow key={report.id}>
+            <TableRow key={report.docId}>
+              <TableCell>{report.docId}</TableCell>
               <TableCell>{report.clientName}</TableCell>
               <TableCell className="max-w-xs truncate">
                 {report.serviceAddress1}

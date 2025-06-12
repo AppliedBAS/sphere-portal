@@ -10,6 +10,7 @@ export interface ServiceReport {
     contactPhone: string;
     contactName: string;
     createdAt: Timestamp;
+    docId: number;
     dateSigned?: Timestamp;
     draft: boolean;
     materialNotes: string;

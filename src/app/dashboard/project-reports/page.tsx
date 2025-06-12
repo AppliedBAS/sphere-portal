@@ -32,7 +32,9 @@ export default function ProjectReports() {
 
   // --- Table state ---
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortColumn, setSortColumn] = useState<"clientName" | "location" | "createdAt">("createdAt");
+  const [sortColumn, setSortColumn] = useState<
+    "projectDocId" | "docId" | "clientName" | "location" | "createdAt"
+  >("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [pageIndex, setPageIndex] = useState(0);
   const pageSize = 25;
@@ -44,7 +46,6 @@ export default function ProjectReports() {
       const data = querySnapshot.docs.map((doc) => {
         const raw = doc.data();
         return {
-          // Use Firestore document ID as `id`
           id: doc.id,
           docId: raw["doc-id"] as number,
           projectDocId: raw["project-doc-id"] as number,
@@ -92,6 +93,12 @@ export default function ProjectReports() {
       } else if (sortColumn === "location") {
         aVal = a.location.toLowerCase();
         bVal = b.location.toLowerCase();
+      } else if (sortColumn === "projectDocId") {
+        aVal = a.projectDocId;
+        bVal = b.projectDocId;
+      } else if (sortColumn === "docId") {
+        aVal = a.docId;
+        bVal = b.docId;
       } else {
         // createdAt
         aVal = a.createdAt.toMillis();
@@ -125,7 +132,7 @@ export default function ProjectReports() {
   // Helper to format Firestore Timestamp
   const formatDate = (ts: Timestamp) => ts.toDate().toLocaleString();
 
-  const toggleSort = (column: "clientName" | "location" | "createdAt") => {
+  const toggleSort = (column: "projectDocId" | "docId" | "clientName" | "location" | "createdAt") => {
     if (sortColumn === column) {
       setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
     } else {
@@ -171,6 +178,34 @@ export default function ProjectReports() {
         <TableHeader>
           {/* Wrap all <TableHead> in a single <TableRow> */}
           <TableRow>
+            <TableHead
+              className="cursor-pointer"
+              onClick={() => toggleSort("projectDocId")}
+            >
+              <div className="flex items-center">
+                Project Doc&nbsp;ID
+                {sortColumn === "projectDocId" &&
+                  (sortDirection === "asc" ? (
+                    <ChevronUp className="h-4 w-4 ml-1" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 ml-1" />
+                  ))}
+              </div>
+            </TableHead>
+            <TableHead
+              className="cursor-pointer"
+              onClick={() => toggleSort("docId")}
+            >
+              <div className="flex items-center">
+                Doc&nbsp;ID
+                {sortColumn === "docId" &&
+                  (sortDirection === "asc" ? (
+                    <ChevronUp className="h-4 w-4 ml-1" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 ml-1" />
+                  ))}
+              </div>
+            </TableHead>
             <TableHead
               className="cursor-pointer"
               onClick={() => toggleSort("clientName")}
@@ -227,6 +262,8 @@ export default function ProjectReports() {
           {paginated.map((report) => (
             // Use report.id (the Firestore doc ID) as the key
             <TableRow key={report.id}>
+              <TableCell>{report.projectDocId}</TableCell>
+              <TableCell>{report.docId}</TableCell>
               <TableCell>{report.clientName}</TableCell>
               <TableCell>{report.location}</TableCell>
               <TableCell className="max-w-xs truncate">

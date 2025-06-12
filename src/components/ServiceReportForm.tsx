@@ -23,6 +23,15 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { format, parseISO } from "date-fns";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
 
 // ShadCN Select imports:
 import {
@@ -210,6 +219,37 @@ export default function ServiceReportForm({
     setSubmitting(false);
   };
 
+  // Add state for dialog and new building form
+  const [addBuildingOpen, setAddBuildingOpen] = useState(false);
+  const [newBuilding, setNewBuilding] = useState({
+    serviceAddress1: "",
+    serviceAddress2: "",
+    cityStateZip: "",
+    contactName: "",
+    contactEmail: "",
+    contactPhone: "",
+  });
+
+  const handleNewBuildingChange = (field: string, value: string) => {
+    setNewBuilding((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleAddBuilding = (e: FormEvent) => {
+    e.preventDefault();
+    // TODO: Replace with actual create logic
+    console.log("New building to create:", newBuilding);
+    setAddBuildingOpen(false);
+    setNewBuilding({
+      serviceAddress1: "",
+      serviceAddress2: "",
+      cityStateZip: "",
+      contactName: "",
+      contactEmail: "",
+      contactPhone: "",
+    });
+    toast.success("Building creation not implemented");
+  };
+
   return (
     <form onSubmit={handleSubmit}>
       <div className="mt-4 flex flex-col gap-6">
@@ -238,13 +278,6 @@ export default function ServiceReportForm({
             setSelectedClient={(selected) => {
               setClient(selected || null);
 
-              // if (selected) {
-              //   // Immediately populate clientName from the selected ClientHit
-              //   setClientName(selected.clientName);
-              // } else {
-              //   setClientName("");
-              // }
-
               // Clear any previously selected building and all its dependent fields:
               setBuilding(null);
               setContactName("");
@@ -259,84 +292,159 @@ export default function ServiceReportForm({
 
         {/* === Building Select (ShadCN) – only if client chosen === */}
         {client && (
-          <div className="flex flex-col space-y-2">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="buildingSelect">Building Select</Label>
             {client.buildings && client.buildings.length > 0 ? (
-              <Select
-                value={building ? building.serviceAddress1 : ""}
-                onValueChange={(val) => {
-                  if (val === "__create__") {
-                    toast.info("Create Building dialog not implemented");
-                    return;
-                  }
-                  if (val === "") {
-                    setBuilding(null);
-                    setContactName("");
-                    setContactEmail("");
-                    setContactPhone("");
-                    setServiceAddress1("");
-                    setServiceAddress2("");
-                    setCityStateZip("");
-                    return;
-                  }
+              <div className="flex flex-col gap-2">
+                <Select
+                  value={building ? building.serviceAddress1 : ""}
+                  onValueChange={(val) => {
+                    if (val === "__create__") {
+                      toast.info("Create Building dialog not implemented");
+                      return;
+                    }
+                    if (val === "") {
+                      setBuilding(null);
+                      setContactName("");
+                      setContactEmail("");
+                      setContactPhone("");
+                      setServiceAddress1("");
+                      setServiceAddress2("");
+                      setCityStateZip("");
+                      return;
+                    }
 
-                  const found = client.buildings.find(
-                    (bld) => bld.serviceAddress1 === val
-                  );
+                    const found = client.buildings.find(
+                      (bld) => bld.serviceAddress1 === val
+                    );
 
-                  if (found) {
-                    console.log("Selected building:", found);
-                    setBuilding(found);
-                    setContactName(found.contactName ?? "");
-                    setContactEmail(found.contactEmail ?? "");
-                    setContactPhone(found.contactPhone ?? "");
-                    setServiceAddress1(found.serviceAddress1 ?? "");
-                    setServiceAddress2(found.serviceAddress2 ?? "");
-                    setCityStateZip(found.cityStateZip ?? "");
-                  }
-                }}
-              >
-                <SelectTrigger id="buildingSelect">
-                  <SelectValue placeholder="Select a building..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Buildings</SelectLabel>
-                    {client.buildings.map((bld) => (
-                      <SelectItem
-                        key={bld.serviceAddress1}
-                        value={bld.serviceAddress1}
-                        className="py-2"
-                      >
-                        {bld.serviceAddress1}
-                      </SelectItem>
-                    ))}
-                    <SelectItem
-                      value="__create__"
-                      className="text-card-foreground font-semibold py-4"
-                    >
-                      + Create Building
-                    </SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+                    if (found) {
+                      setBuilding(found);
+                      setContactName(found.contactName ?? "");
+                      setContactEmail(found.contactEmail ?? "");
+                      setContactPhone(found.contactPhone ?? "");
+                      setServiceAddress1(found.serviceAddress1 ?? "");
+                      setServiceAddress2(found.serviceAddress2 ?? "");
+                      setCityStateZip(found.cityStateZip ?? "");
+                    }
+                  }}
+                >
+                  <SelectTrigger id="buildingSelect">
+                    <SelectValue placeholder="Select a building..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>Buildings</SelectLabel>
+                      {client.buildings.map((bld) => (
+                        <SelectItem
+                          key={bld.serviceAddress1}
+                          value={bld.serviceAddress1}
+                          className="py-2"
+                        >
+                          {bld.serviceAddress1}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
             ) : (
               <div className="flex flex-col gap-2">
                 <div className="text-muted-foreground text-sm">
                   No buildings found.
                 </div>
+              </div>
+            )}
+            <Dialog open={addBuildingOpen} onOpenChange={setAddBuildingOpen}>
+              <DialogTrigger asChild>
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() =>
-                    toast.info("Create Building dialog not implemented")
-                  }
                   className="w-fit"
                 >
-                  + Create Building
+                  + Add Building
                 </Button>
-              </div>
-            )}
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Building</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleAddBuilding} className="space-y-4">
+                  <div className="flex flex-col space-y-2">
+                    <Label htmlFor="new_serviceAddress1">Service Address 1</Label>
+                    <Input
+                      id="new_serviceAddress1"
+                      value={newBuilding.serviceAddress1}
+                      onChange={(e) =>
+                        handleNewBuildingChange("serviceAddress1", e.target.value)
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="flex flex-col space-y-2">
+                    <Label htmlFor="new_serviceAddress2">Service Address 2</Label>
+                    <Input
+                      id="new_serviceAddress2"
+                      value={newBuilding.serviceAddress2}
+                      onChange={(e) =>
+                        handleNewBuildingChange("serviceAddress2", e.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col space-y-2">
+                    <Label htmlFor="new_cityStateZip">City, State, ZIP</Label>
+                    <Input
+                      id="new_cityStateZip"
+                      value={newBuilding.cityStateZip}
+                      onChange={(e) =>
+                        handleNewBuildingChange("cityStateZip", e.target.value)
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="flex flex-col space-y-2">
+                    <Label htmlFor="new_contactName">Contact Name</Label>
+                    <Input
+                      id="new_contactName"
+                      value={newBuilding.contactName}
+                      onChange={(e) =>
+                        handleNewBuildingChange("contactName", e.target.value)
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="flex flex-col space-y-2">
+                    <Label htmlFor="new_contactEmail">Contact Email</Label>
+                    <Input
+                      id="new_contactEmail"
+                      value={newBuilding.contactEmail}
+                      onChange={(e) =>
+                        handleNewBuildingChange("contactEmail", e.target.value)
+                      }
+                      type="email"
+                      required
+                    />
+                  </div>
+                  <div className="flex flex-col space-y-2">
+                    <Label htmlFor="new_contactPhone">Contact Phone</Label>
+                    <Input
+                      id="new_contactPhone"
+                      value={newBuilding.contactPhone}
+                      onChange={(e) =>
+                        handleNewBuildingChange("contactPhone", e.target.value)
+                      }
+                      required
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit" variant="default">Add Building</Button>
+                    <DialogClose asChild>
+                      <Button type="button" variant="outline">Cancel</Button>
+                    </DialogClose>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
 

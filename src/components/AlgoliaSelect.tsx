@@ -55,6 +55,7 @@ export function AlgoliaSelect<HitType>({
 
   function HitWrapper({ hit }: { hit: Hit }) {
     const item = mapHit(hit);
+
     return (
       <CommandItem
         onSelect={() => {
@@ -93,7 +94,9 @@ export function AlgoliaSelect<HitType>({
           <PopoverContent className="w-[400px] max-h-80 overflow-y-auto">
             <Command>
               <SearchBox />
-              <Hits hitComponent={HitWrapper} />
+              <CommandGroup>
+                <Hits hitComponent={HitWrapper} />
+              </CommandGroup>
               <CommandGroup>
                 <CommandItem
                   onSelect={() => {
