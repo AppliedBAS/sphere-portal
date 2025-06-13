@@ -6,7 +6,7 @@ export default function ServiceReportsLayout({
     children: React.ReactNode;
 }) {
     return (
-        <div className="min-h-screen px-8">
+        <div>
             <main>{children}</main>
         </div>
     );

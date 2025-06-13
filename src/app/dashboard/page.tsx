@@ -2,17 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { firestore } from "@/lib/firebase";
-import {
-  collection,
-  getCountFromServer,
-  query,
-  where,
-} from "firebase/firestore";
-import { ArrowRight } from "lucide-react";
-
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,100 +11,168 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogClose,
 } from "@/components/ui/dialog";
-
-interface Counts {
-  projectReports: number;
-  serviceReports: number;
-  purchaseOrders: number;
-  draftProjectReports: number;
-  draftServiceReports: number;
-  draftPurchaseOrders: number;
-  draftReports: number;
-}
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { firestore } from "@/lib/firebase";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import type { ProjectReport } from "@/models/ProjectReport";
+import type { ServiceReport } from "@/models/ServiceReport";
+import type { PurchaseOrder } from "@/models/PurchaseOrder";
+import { DashboardCard } from "@/components/DashboardCard";
+import { CreditCardIcon, ClipboardList, FolderIcon } from "lucide-react";
 
 export default function Dashboard() {
   const router = useRouter();
-
-  const [counts, setCounts] = useState<Counts>({
-    projectReports: 0,
-    serviceReports: 0,
-    purchaseOrders: 0,
-    draftProjectReports: 0,
-    draftServiceReports: 0,
-    draftPurchaseOrders: 0,
-    draftReports: 0,
-  });
-  const [loadingCounts, setLoadingCounts] = useState<boolean>(true);
+  const [data, setData] = useState<{
+    projectReports: ProjectReport[];
+    serviceReports: ServiceReport[];
+    purchaseOrders: PurchaseOrder[];
+  }>({ projectReports: [], serviceReports: [], purchaseOrders: [] });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchCounts() {
-      setLoadingCounts(true);
-
-      // 1) Total Project Reports
-      const projectSnap = await getCountFromServer(
-        collection(firestore, "project reports")
+    async function fetchData() {
+      setLoading(true);
+      const prSnap = await getDocs(
+        query(
+          collection(firestore, "project reports"),
+          where("draft", "==", true)
+        )
       );
-      // 1a) Draft Project Reports
-      const projectDraftQuery = query(
-        collection(firestore, "project reports"),
-        where("draft", "==", true)
+      const srSnap = await getDocs(
+        query(collection(firestore, "reports"), where("draft", "==", true))
       );
-      const draftProjectSnap = await getCountFromServer(projectDraftQuery);
-
-      // 2) Total Service Reports
-      const serviceSnap = await getCountFromServer(
-        collection(firestore, "reports")
+      const poSnap = await getDocs(
+        query(collection(firestore, "orders"), where("status", "==", "OPEN"))
       );
-      // 2a) Draft Service Reports
-      const serviceDraftQuery = query(
-        collection(firestore, "reports"),
-        where("draft", "==", true)
-      );
-      const draftServiceSnap = await getCountFromServer(serviceDraftQuery);
-
-      // 3) Total Purchase Orders
-      const ordersSnap = await getCountFromServer(
-        collection(firestore, "orders")
-      );
-      // 3a) “Draft” Purchase Orders (status = OPEN)
-      const ordersDraftQuery = query(
-        collection(firestore, "orders"),
-        where("status", "==", "OPEN")
-      );
-      const draftOrdersSnap = await getCountFromServer(ordersDraftQuery);
-
-      setCounts({
-        projectReports: projectSnap.data().count,
-        serviceReports: serviceSnap.data().count,
-        purchaseOrders: ordersSnap.data().count,
-        draftProjectReports: draftProjectSnap.data().count,
-        draftServiceReports: draftServiceSnap.data().count,
-        draftPurchaseOrders: draftOrdersSnap.data().count,
-        draftReports:
-          draftProjectSnap.data().count +
-          draftServiceSnap.data().count +
-          draftOrdersSnap.data().count,
+      setData({
+        projectReports: prSnap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            docId: data["doc-id"],
+            projectDocId: data["project-doc-id"],
+            clientName: data["client-name"],
+            location: data["location"],
+            description: data["description"],
+            notes: data["notes"],
+            materials: data["materials"],
+            draft: data["draft"],
+            createdAt: data["created-at"],
+            authorTechnicianRef: data["author-technician-ref"],
+            leadTechnicianRef: data["lead-technician-ref"],
+            assignedTechniciansRef: data["assigned-technicians-ref"],
+          } as ProjectReport;
+        }),
+        serviceReports: srSnap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            authorTechnicianRef: data["author-technician-ref"],
+            cityStateZip: data["city-state-zip"],
+            clientName: data["client-name"],
+            contactEmail: data["contact-email"],
+            contactPhone: data["contact-phone"],
+            contactName: data["contact-name"],
+            createdAt: data["created-at"],
+            docId: data["doc-id"],
+            dateSigned: data["date-signed"],
+            draft: data["draft"],
+            materialNotes: data["material-notes"],
+            printedName: data["printed-name"],
+            serviceAddress1: data["service-address1"],
+            serviceAddress2: data["service-address2"],
+            serviceNotes: data["service-notes"],
+          } as ServiceReport;
+        }),
+        purchaseOrders: poSnap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            amount: data["amount"],
+            createdAt: data["created-at"],
+            description: data["description"],
+            docId: data["doc-id"],
+            otherCategory: data["other-category"],
+            projectDocId: data["project-doc-id"],
+            serviceReportDocId: data["service-report-doc-id"],
+            status: data["status"],
+            technicianRef: data["technician-ref"],
+            vendor: data["vendor"],
+          } as PurchaseOrder;
+        }),
       });
-
-      setLoadingCounts(false);
+      setLoading(false);
     }
-
-    fetchCounts();
+    fetchData();
   }, []);
 
+  const renderPurchaseOrderCards = (items: PurchaseOrder[]) => (
+    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      {items.map((item) => (
+        <DashboardCard
+          key={item.id}
+          icon={<CreditCardIcon />}
+          subtitle={`PO ${item.docId}`}
+          title={item.vendor}
+          date={
+            item.createdAt && item.createdAt.toDate
+              ? item.createdAt.toDate().toLocaleDateString()
+              : ""
+          }
+          onOpen={() => router.push(`/dashboard/purchase-orders/${item.id}`)}
+        />
+      ))}
+    </div>
+  );
+
+  const renderServiceReportCards = (items: ServiceReport[]) => (
+    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      {items.map((item) => (
+        <DashboardCard
+          key={item.id}
+          icon={<ClipboardList />}
+          title={item.clientName}
+          subtitle={`SR ${item.docId}`}
+          date={
+            item.createdAt && item.createdAt.toDate
+              ? item.createdAt.toDate().toLocaleDateString()
+              : ""
+          }
+          onOpen={() => router.push(`/dashboard/service-reports/${item.id}`)}
+        />
+      ))}
+    </div>
+  );
+
+  const renderProjectReportCards = (items: ProjectReport[]) => (
+    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      {items.map((item) => (
+        <DashboardCard
+          key={item.id}
+          icon={<FolderIcon />}
+          title={item.clientName}
+          subtitle={`PR ${item.projectDocId} - ${item.docId}`}
+          date={
+            item.createdAt && item.createdAt.toDate
+              ? item.createdAt.toDate().toLocaleDateString()
+              : ""
+          }
+          onOpen={() => router.push(`/dashboard/project-reports/${item.id}`)}
+        />
+      ))}
+    </div>
+  );
+
   return (
-    <div className="px-8 py-6 space-y-6">
-      {/* 1. Header */}
+    <div className="space-y-6 pb-8">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Dashboard</h1>
-
-        {/* Dialog Trigger for “Create New Report” */}
         <Dialog>
           <DialogTrigger asChild>
             <Button variant="secondary">Create New Report</Button>
           </DialogTrigger>
-
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Select Report Type</DialogTitle>
@@ -123,144 +180,77 @@ export default function Dashboard() {
                 Choose which kind of report you want to create.
               </DialogDescription>
             </DialogHeader>
-
             <div className="grid gap-3 py-4">
               <Button
                 variant="outline"
-                onClick={() =>
-                  router.push("/dashboard/service-reports/create")
-                }
+                onClick={() => router.push("/dashboard/service-reports/create")}
               >
                 Service Report
               </Button>
               <Button
                 variant="outline"
-                onClick={() =>
-                  router.push("/dashboard/project-reports/create")
-                }
+                onClick={() => router.push("/dashboard/project-reports/create")}
               >
                 Project Report
               </Button>
               <Button
                 variant="outline"
-                onClick={() =>
-                  router.push("/dashboard/purchase-orders/create")
-                }
+                onClick={() => router.push("/dashboard/purchase-orders/create")}
               >
                 Purchase Order
               </Button>
             </div>
-
             <DialogFooter>
-              <Button variant="outline">Cancel</Button>
+              <DialogClose asChild>
+                <Button variant="outline">Cancel</Button>
+              </DialogClose>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* 2. Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Project Reports Card */}
-        <Card className="relative p-6 flex flex-col">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-4 right-4"
-            onClick={() => router.push("/dashboard/project-reports")}
-          >
-            <ArrowRight />
-          </Button>
+      {loading ? (
+        <p>Loading...</p>
+      ) : (
+        <Tabs defaultValue="all" className="space-y-4">
+          <TabsList className="grid grid-cols-4">
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="orders">POs</TabsTrigger>
+            <TabsTrigger value="services">SRs</TabsTrigger>
+            <TabsTrigger value="projects">PRs</TabsTrigger>
+          </TabsList>
 
-          <div>
-            <span className="text-card-foreground mb-2">Project Reports</span>
-            <div className="flex items-end space-x-2">
-              <span className="text-3xl font-bold">
-                {loadingCounts ? "..." : counts.projectReports}
-              </span>
-              {!loadingCounts && (
-                <Badge variant="outline">
-                  {counts.draftProjectReports} Drafts
-                </Badge>
-              )}
-            </div>
-          </div>
-        </Card>
+          <TabsContent value="all">
+            <section>
+              <h2 className="text-2xl font-semibold mb-4">Purchase Orders</h2>
+              {renderPurchaseOrderCards(data.purchaseOrders)}
+            </section>
+            <section className="mt-8">
+              <h2 className="text-2xl font-semibold mb-4">Service Reports</h2>
+              {renderServiceReportCards(data.serviceReports)}
+            </section>
+            <section className="mt-8">
+              <h2 className="text-2xl font-semibold mb-4">Project Reports</h2>
+              {renderProjectReportCards(data.projectReports)}
+            </section>
+          </TabsContent>
 
-        {/* Service Reports Card */}
-        <Card className="relative p-6 flex flex-col">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-4 right-4"
-            onClick={() => router.push("/dashboard/service-reports")}
-          >
-            <ArrowRight />
-          </Button>
+          <TabsContent value="orders">
+            <h2 className="text-2xl font-semibold mb-4">Purchase Orders</h2>
+            {renderPurchaseOrderCards(data.purchaseOrders)}
+          </TabsContent>
 
-          <div>
-            <span className="text-card-foreground mb-2">Service Reports</span>
-            <div className="flex items-end space-x-2">
-              <span className="text-3xl font-bold">
-                {loadingCounts ? "..." : counts.serviceReports}
-              </span>
-              {!loadingCounts && (
-                <Badge variant="outline">
-                  {counts.draftServiceReports} Drafts
-                </Badge>
-              )}
-            </div>
-          </div>
-        </Card>
+          <TabsContent value="services">
+            <h2 className="text-2xl font-semibold mb-4">Service Reports</h2>
+            {renderServiceReportCards(data.serviceReports)}
+          </TabsContent>
 
-        {/* Purchase Orders Card */}
-        <Card className="relative p-6 flex flex-col">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-4 right-4"
-            onClick={() => router.push("/dashboard/purchase-orders")}
-          >
-            <ArrowRight />
-          </Button>
-
-          <div>
-            <span className="text-card-foreground mb-2">
-              Purchase Orders
-            </span>
-            <div className="flex items-end space-x-2">
-              <span className="text-3xl font-bold">
-                {loadingCounts ? "..." : counts.purchaseOrders}
-              </span>
-              {!loadingCounts && (
-                <Badge variant="outline">
-                  {counts.draftPurchaseOrders} Drafts
-                </Badge>
-              )}
-            </div>
-          </div>
-        </Card>
-
-        {/* Draft Reports Card */}
-        <Card className="relative p-6 flex flex-col">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-4 right-4"
-            onClick={() => router.push("/dashboard/draft-reports")}
-          >
-            <ArrowRight />
-          </Button>
-
-          <div>
-            <span className="text-card-foreground mb-2">Draft Reports</span>
-            <div className="flex items-end space-x-2">
-              <span className="text-3xl font-bold">
-                {loadingCounts ? "..." : counts.draftReports}
-              </span>
-            </div>
-          </div>
-        </Card>
-      </div>
+          <TabsContent value="projects">
+            <h2 className="text-2xl font-semibold mb-4">Project Reports</h2>
+            {renderProjectReportCards(data.projectReports)}
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   );
 }
