@@ -42,6 +42,8 @@ import {
   SelectGroup,
   SelectLabel,
 } from "@/components/ui/select";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { firestore } from "@/lib/firebase";
 
 interface ServiceReportFormProps {
   serviceReport?: ServiceReport;
@@ -147,31 +149,99 @@ export default function ServiceReportForm({
           } as EmployeeModel);
         }
       }
+      // Populate client from serviceReport.clientName if available
+      if (serviceReport.clientName) {
+        // Find client by clientName in Firestore and set as ClientHit
+        const q = query(
+          collection(firestore, "clients"),
+          where("name", "==", serviceReport.clientName)
+        );
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          const docSnap = querySnapshot.docs[0];
+          const data = docSnap.data();
+          const clientHit: ClientHit = {
+            objectID: docSnap.id,
+            clientName: data["name"],
+            active: data.active,
+            buildings: Array.isArray(data.buildings)
+              ? data.buildings.map((bld: unknown) => {
+                  if (
+                    typeof bld === "object" &&
+                    bld !== null &&
+                    "cityStateZip" in bld &&
+                    "contactEmail" in bld &&
+                    "contactPhone" in bld &&
+                    "contactName" in bld &&
+                    "serviceAddress1" in bld &&
+                    "serviceAddress2" in bld
+                  ) {
+                    const b = bld as Record<string, unknown>;
+                    return {
+                      cityStateZip: String(b["city-state-zip"] ?? ""),
+                      contactEmail: String(b["contact-email"] ?? ""),
+                      contactPhone: String(b["contact-phone"] ?? ""),
+                      contactName: String(b["contact-name"] ?? ""),
+                      serviceAddress1: String(b["service-address1"] ?? ""),
+                      serviceAddress2: String(b["service-address2"] ?? ""),
+                    };
+                  }
+                  // fallback empty building
+                  return {
+                    cityStateZip: "",
+                    contactEmail: "",
+                    contactPhone: "",
+                    contactName: "",
+                    serviceAddress1: "",
+                    serviceAddress2: "",
+                  };
+                })
+              : [],
+          };
+          setClient(clientHit);
+          // Set building if possible
+          const foundBuilding = clientHit.buildings.find(
+            (bld) => bld.serviceAddress1 === serviceReport.serviceAddress1
+          );
+          setBuilding(foundBuilding ?? null);
+        }
+      }
 
-      // If there was already a saved client/building on the report, populate those fields:
-      // if (serviceReport.clientName) {
-      //   setClientName(serviceReport.clientName);
-      // }
-      if (serviceReport.contactName) {
-        setContactName(serviceReport.contactName);
+      // Populate all fields from the serviceReport
+      setContactName(serviceReport.contactName || "");
+      setContactEmail(serviceReport.contactEmail || "");
+      setContactPhone(serviceReport.contactPhone || "");
+      setServiceAddress1(serviceReport.serviceAddress1 || "");
+      setServiceAddress2(serviceReport.serviceAddress2 || "");
+      setCityStateZip(serviceReport.cityStateZip || "");
+      setMaterialNotes(serviceReport.materialNotes || "");
+
+      // If client info is available, set client (if ClientSelect supports it)
+      // If building info is available, set building
+      if (serviceReport.clientName && Array.isArray(client?.buildings)) {
+        const foundBuilding = client.buildings.find(
+          (bld) => bld.serviceAddress1 === serviceReport.serviceAddress1
+        );
+        setBuilding(foundBuilding ?? null);
       }
-      if (serviceReport.contactEmail) {
-        setContactEmail(serviceReport.contactEmail);
-      }
-      if (serviceReport.contactPhone) {
-        setContactPhone(serviceReport.contactPhone);
-      }
-      if (serviceReport.serviceAddress1) {
-        setServiceAddress1(serviceReport.serviceAddress1);
-      }
-      if (serviceReport.serviceAddress2) {
-        setServiceAddress2(serviceReport.serviceAddress2);
-      }
-      if (serviceReport.cityStateZip) {
-        setCityStateZip(serviceReport.cityStateZip);
+
+      // Populate service notes
+      if (serviceReport.serviceNotes && serviceReport.serviceNotes.length > 0) {
+        setServiceNotesInputs(
+          serviceReport.serviceNotes.map((sn) => ({
+            date: sn.date.toDate().toISOString().substring(0, 10),
+            technicianTime: sn.technicianTime,
+            technicianOvertime: sn.technicianOvertime,
+            helperTime: sn.helperTime,
+            helperOvertime: sn.helperOvertime,
+            remoteWork: sn.remoteWork,
+            notes: sn.serviceNotes,
+          }))
+        );
       }
     }
     initForm();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serviceReport]);
 
   const handleAddServiceNote = () => {
@@ -236,7 +306,6 @@ export default function ServiceReportForm({
   const handleAddBuilding = (e: FormEvent) => {
     e.preventDefault();
     // TODO: Replace with actual create logic
-    console.log("New building to create:", newBuilding);
     setAddBuildingOpen(false);
     setNewBuilding({
       serviceAddress1: "",
@@ -335,13 +404,15 @@ export default function ServiceReportForm({
                     <SelectGroup>
                       <SelectLabel>Buildings</SelectLabel>
                       {client.buildings.map((bld) => (
-                        <SelectItem
-                          key={bld.serviceAddress1}
-                          value={bld.serviceAddress1}
-                          className="py-2"
-                        >
-                          {bld.serviceAddress1}
-                        </SelectItem>
+                        bld.serviceAddress1 !== "" && (
+                          <SelectItem
+                            key={bld.serviceAddress1}
+                            value={bld.serviceAddress1}
+                            className="py-2"
+                          >
+                            {bld.serviceAddress1}
+                          </SelectItem>
+                        )
                       ))}
                     </SelectGroup>
                   </SelectContent>
@@ -447,65 +518,65 @@ export default function ServiceReportForm({
           </div>
         )}
 
-        {/* === Populate Contact & Address as Read‐Only Inputs === */}
-        {building && (
-          <>
-            <div className="flex flex-col space-y-2">
-              <Label htmlFor="contactName">Contact Name</Label>
-              <Input
-                id="contactName"
-                value={contactName}
-                readOnly
-                placeholder="Contact Name"
-              />
-            </div>
-            <div className="flex flex-col space-y-2">
-              <Label htmlFor="contactEmail">Contact Email</Label>
-              <Input
-                id="contactEmail"
-                value={contactEmail}
-                readOnly
-                placeholder="Contact Email"
-              />
-            </div>
-            <div className="flex flex-col space-y-2">
-              <Label htmlFor="contactPhone">Contact Phone</Label>
-              <Input
-                id="contactPhone"
-                value={contactPhone}
-                readOnly
-                placeholder="Contact Phone"
-              />
-            </div>
-            <div className="flex flex-col space-y-2">
-              <Label htmlFor="serviceAddress1">Service Address 1</Label>
-              <Input
-                id="serviceAddress1"
-                value={serviceAddress1}
-                readOnly
-                placeholder="Address Line 1"
-              />
-            </div>
-            <div className="flex flex-col space-y-2">
-              <Label htmlFor="serviceAddress2">Service Address 2</Label>
-              <Input
-                id="serviceAddress2"
-                value={serviceAddress2}
-                readOnly
-                placeholder="Address Line 2"
-              />
-            </div>
-            <div className="flex flex-col space-y-2">
-              <Label htmlFor="cityStateZip">City, State, ZIP</Label>
-              <Input
-                id="cityStateZip"
-                value={cityStateZip}
-                readOnly
-                placeholder="City, State ZIP"
-              />
-            </div>
-          </>
-        )}
+        {/* === Contact & Address Fields (always editable, visually separated) === */}
+        <div className="flex flex-col gap-4 p-4 mt-4 mb-2 border rounded-lg bg-muted/30">
+          <span className="font-semibold text-sm mb-2">Contact Information</span>
+          <div className="flex flex-col space-y-2">
+            <Label htmlFor="contactName">Contact Name</Label>
+            <Input
+              id="contactName"
+              value={contactName}
+              onChange={(e) => setContactName(e.target.value)}
+              placeholder="Contact Name"
+            />
+          </div>
+          <div className="flex flex-col space-y-2">
+            <Label htmlFor="contactEmail">Contact Email</Label>
+            <Input
+              id="contactEmail"
+              value={contactEmail}
+              onChange={(e) => setContactEmail(e.target.value)}
+              placeholder="Contact Email"
+              type="email"
+            />
+          </div>
+          <div className="flex flex-col space-y-2">
+            <Label htmlFor="contactPhone">Contact Phone</Label>
+            <Input
+              id="contactPhone"
+              value={contactPhone}
+              onChange={(e) => setContactPhone(e.target.value)}
+              placeholder="Contact Phone"
+            />
+          </div>
+          <div className="flex flex-col space-y-2">
+            <Label htmlFor="serviceAddress1">Service Address 1</Label>
+            <Input
+              id="serviceAddress1"
+              value={serviceAddress1}
+              onChange={(e) => setServiceAddress1(e.target.value)}
+              placeholder="Address Line 1"
+            />
+          </div>
+          <div className="flex flex-col space-y-2">
+            <Label htmlFor="serviceAddress2">Service Address 2</Label>
+            <Input
+              id="serviceAddress2"
+              value={serviceAddress2}
+              onChange={(e) => setServiceAddress2(e.target.value)}
+              placeholder="Address Line 2"
+            />
+          </div>
+          <div className="flex flex-col space-y-2">
+            <Label htmlFor="cityStateZip">City, State, ZIP</Label>
+            <Input
+              id="cityStateZip"
+              value={cityStateZip}
+              onChange={(e) => setCityStateZip(e.target.value)}
+              placeholder="City, State ZIP"
+            />
+          </div>
+        </div>
 
         {/* === Material Notes === */}
         <div className="flex flex-col space-y-2">

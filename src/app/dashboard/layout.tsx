@@ -12,9 +12,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
       <SidebarProvider>
         <AppSidebar />
-        <SidebarTrigger className="p-4 m-2"/>
-        <main className="flex-1 h-screen w-full py-8 pr-8">
-          {children}
+        <main className="flex-1 h-screen w-full">
+          <SidebarTrigger className="p-4 m-2"/>
+          <div className="px-4 md:px-8 py-4">
+            {children}
+          </div>
         </main>
       </SidebarProvider>
   );

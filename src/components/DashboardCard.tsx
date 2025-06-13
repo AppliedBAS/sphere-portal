@@ -17,7 +17,7 @@ export function DashboardCard({
   onOpen,
 }: DashboardCardProps) {
   return (
-    <Card className="relative flex flex-col justify-center min-h-[96px] p-4 cursor-pointer" onClick={onOpen}>
+    <Card className="relative flex flex-col justify-center min-h-[70px] p-4 cursor-pointer" onClick={onOpen}>
       {/* Open icon top right */}
       <div className="flex items-center h-full">
         {/* Icon left */}

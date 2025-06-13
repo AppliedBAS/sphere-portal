@@ -109,7 +109,7 @@ export default function Dashboard() {
   }, []);
 
   const renderPurchaseOrderCards = (items: PurchaseOrder[]) => (
-    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-4 gap-6">
       {items.map((item) => (
         <DashboardCard
           key={item.id}
@@ -128,7 +128,7 @@ export default function Dashboard() {
   );
 
   const renderServiceReportCards = (items: ServiceReport[]) => (
-    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-4 gap-6">
       {items.map((item) => (
         <DashboardCard
           key={item.id}
@@ -147,7 +147,7 @@ export default function Dashboard() {
   );
 
   const renderProjectReportCards = (items: ProjectReport[]) => (
-    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-4 gap-6">
       {items.map((item) => (
         <DashboardCard
           key={item.id}
@@ -167,15 +167,17 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 pb-8">
+      
+      {/* Title and Create Button */}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <Dialog>
           <DialogTrigger asChild>
-            <Button variant="secondary">Create New Report</Button>
+            <Button variant="secondary" className="text-lg md:text-sm">Create New Report</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Select Report Type</DialogTitle>
+              <DialogTitle className="text-lg md:text-sm">Select Report Type</DialogTitle>
               <DialogDescription>
                 Choose which kind of report you want to create.
               </DialogDescription>
@@ -213,7 +215,7 @@ export default function Dashboard() {
         <p>Loading...</p>
       ) : (
         <Tabs defaultValue="all" className="space-y-4">
-          <TabsList className="grid grid-cols-4">
+          <TabsList className="grid grid-cols-4 w-full">
             <TabsTrigger value="all">All</TabsTrigger>
             <TabsTrigger value="orders">POs</TabsTrigger>
             <TabsTrigger value="services">SRs</TabsTrigger>
@@ -222,32 +224,56 @@ export default function Dashboard() {
 
           <TabsContent value="all">
             <section>
-              <h2 className="text-2xl font-semibold mb-4">Purchase Orders</h2>
-              {renderPurchaseOrderCards(data.purchaseOrders)}
+              <h2 className="text-xl font-semibold mb-4">Purchase Orders</h2>
+              {data.purchaseOrders.length === 0 ? (
+                <p>No purchase orders found.</p>
+              ) : (
+                renderPurchaseOrderCards(data.purchaseOrders)
+              )}
             </section>
             <section className="mt-8">
-              <h2 className="text-2xl font-semibold mb-4">Service Reports</h2>
-              {renderServiceReportCards(data.serviceReports)}
+              <h2 className="text-xl font-semibold mb-4">Service Reports</h2>
+              {data.serviceReports.length === 0 ? (
+                <p>No service reports found.</p>
+              ) : (
+                renderServiceReportCards(data.serviceReports)
+              )}
             </section>
             <section className="mt-8">
-              <h2 className="text-2xl font-semibold mb-4">Project Reports</h2>
-              {renderProjectReportCards(data.projectReports)}
+              <h2 className="text-xl font-semibold mb-4">Project Reports</h2>
+              {data.projectReports.length === 0 ? (
+                <p>No project reports found.</p>
+              ) : (
+                renderProjectReportCards(data.projectReports)
+              )}
             </section>
           </TabsContent>
 
           <TabsContent value="orders">
-            <h2 className="text-2xl font-semibold mb-4">Purchase Orders</h2>
-            {renderPurchaseOrderCards(data.purchaseOrders)}
+            <h2 className="text-xl font-semibold mb-4">Purchase Orders</h2>
+            {data.purchaseOrders.length === 0 ? (
+              <p>No purchase orders found.</p>
+            ) : (
+              renderPurchaseOrderCards(data.purchaseOrders)
+            )}
           </TabsContent>
 
           <TabsContent value="services">
-            <h2 className="text-2xl font-semibold mb-4">Service Reports</h2>
-            {renderServiceReportCards(data.serviceReports)}
+            <h2 className="text-xl font-semibold mb-4">Service Reports</h2>
+            {data.serviceReports.length === 0 ? (
+              <p>No service reports found.</p>
+            ) : (
+              renderServiceReportCards(data.serviceReports)
+            )}
           </TabsContent>
 
           <TabsContent value="projects">
-            <h2 className="text-2xl font-semibold mb-4">Project Reports</h2>
-            {renderProjectReportCards(data.projectReports)}
+            <h2 className="text-xl font-semibold mb-4">Project Reports</h2>
+            {data.projectReports.length === 0 ? (
+              <p>No project reports found.</p>
+            ) : (
+              renderProjectReportCards(data.projectReports)
+            )}
           </TabsContent>
         </Tabs>
       )}

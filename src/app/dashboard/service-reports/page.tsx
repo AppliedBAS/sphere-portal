@@ -30,6 +30,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 
 export default function ServiceReports() {
   const [reports, setReports] = useState<ServiceReport[]>([]);
@@ -178,6 +179,20 @@ export default function ServiceReports() {
 
   return (
     <div className="space-y-4">
+      {/* Breadcrumb */}
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href="/dashboard">Dashboard</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>Service Reports</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
       <h1 className="text-2xl font-bold">Service Reports</h1>
 
       {/* Search Input */}
@@ -299,7 +314,7 @@ export default function ServiceReports() {
                     variant="outline"
                     className="text-green-800 border-green-300 bg-green-50"
                   >
-                    Published
+                    Submitted
                   </Badge>
                 )}
               </TableCell>
