@@ -74,6 +74,8 @@ const EditServiceReportPage = () => {
           ...snap.data(),
         } as ServiceReport);
       }
+
+      
       setLoading(false);
     }
     fetchReport();

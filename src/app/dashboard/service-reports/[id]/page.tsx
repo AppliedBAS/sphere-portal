@@ -85,6 +85,8 @@ const ServiceReportViewPage = () => {
           ...snap.data(),
         } as ServiceReport);
       }
+      
+
       setLoading(false);
     }
     fetchReport();

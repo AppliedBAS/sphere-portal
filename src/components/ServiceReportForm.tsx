@@ -42,8 +42,16 @@ import {
   SelectGroup,
   SelectLabel,
 } from "@/components/ui/select";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
+import { Calendar as CalendarIcon } from "lucide-react";
 
 interface ServiceReportFormProps {
   serviceReport?: ServiceReport;
@@ -62,8 +70,6 @@ interface ServiceNoteInput {
 export default function ServiceReportForm({
   serviceReport,
 }: ServiceReportFormProps) {
-  // const { user } = useAuth();
-
   const {
     technicians,
     loading: loadingEmployees,
@@ -104,6 +110,17 @@ export default function ServiceReportForm({
     serviceReport?.materialNotes || ""
   );
 
+    // Add state for dialog and new building form
+  const [addBuildingOpen, setAddBuildingOpen] = useState(false);
+  const [newBuilding, setNewBuilding] = useState({
+    serviceAddress1: "",
+    serviceAddress2: "",
+    cityStateZip: "",
+    contactName: "",
+    contactEmail: "",
+    contactPhone: "",
+  });
+
   // Controlled list of service‐note entries
   const [serviceNotesInputs, setServiceNotesInputs] = useState<
     ServiceNoteInput[]
@@ -119,11 +136,11 @@ export default function ServiceReportForm({
     })) || [
       {
         date: "",
-        technicianTime: "",
-        technicianOvertime: "",
-        helperTime: "",
-        helperOvertime: "",
-        remoteWork: "",
+        technicianTime: "0.0",
+        technicianOvertime: "0.0",
+        helperTime: "0.0",
+        helperOvertime: "0.0",
+        remoteWork: "Y",
         notes: "",
       },
     ]
@@ -156,6 +173,7 @@ export default function ServiceReportForm({
           collection(firestore, "clients"),
           where("name", "==", serviceReport.clientName)
         );
+
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
           const docSnap = querySnapshot.docs[0];
@@ -165,40 +183,18 @@ export default function ServiceReportForm({
             clientName: data["name"],
             active: data.active,
             buildings: Array.isArray(data.buildings)
-              ? data.buildings.map((bld: unknown) => {
-                  if (
-                    typeof bld === "object" &&
-                    bld !== null &&
-                    "cityStateZip" in bld &&
-                    "contactEmail" in bld &&
-                    "contactPhone" in bld &&
-                    "contactName" in bld &&
-                    "serviceAddress1" in bld &&
-                    "serviceAddress2" in bld
-                  ) {
-                    const b = bld as Record<string, unknown>;
-                    return {
-                      cityStateZip: String(b["city-state-zip"] ?? ""),
-                      contactEmail: String(b["contact-email"] ?? ""),
-                      contactPhone: String(b["contact-phone"] ?? ""),
-                      contactName: String(b["contact-name"] ?? ""),
-                      serviceAddress1: String(b["service-address1"] ?? ""),
-                      serviceAddress2: String(b["service-address2"] ?? ""),
-                    };
-                  }
-                  // fallback empty building
-                  return {
-                    cityStateZip: "",
-                    contactEmail: "",
-                    contactPhone: "",
-                    contactName: "",
-                    serviceAddress1: "",
-                    serviceAddress2: "",
-                  };
-                })
+              ? data.buildings.map((bld: any) => ({
+                  serviceAddress1: bld["service-address1"],
+                  serviceAddress2: bld["service-address2"],
+                  cityStateZip: bld["city-state-zip"],
+                  contactName: bld["contact-name"],
+                  contactEmail: bld["contact-email"],
+                  contactPhone: bld["contact-phone"],
+                }))
               : [],
           };
           setClient(clientHit);
+          console.log("Client loaded:", clientHit);
           // Set building if possible
           const foundBuilding = clientHit.buildings.find(
             (bld) => bld.serviceAddress1 === serviceReport.serviceAddress1
@@ -206,7 +202,6 @@ export default function ServiceReportForm({
           setBuilding(foundBuilding ?? null);
         }
       }
-
       // Populate all fields from the serviceReport
       setContactName(serviceReport.contactName || "");
       setContactEmail(serviceReport.contactEmail || "");
@@ -215,16 +210,7 @@ export default function ServiceReportForm({
       setServiceAddress2(serviceReport.serviceAddress2 || "");
       setCityStateZip(serviceReport.cityStateZip || "");
       setMaterialNotes(serviceReport.materialNotes || "");
-
-      // If client info is available, set client (if ClientSelect supports it)
-      // If building info is available, set building
-      if (serviceReport.clientName && Array.isArray(client?.buildings)) {
-        const foundBuilding = client.buildings.find(
-          (bld) => bld.serviceAddress1 === serviceReport.serviceAddress1
-        );
-        setBuilding(foundBuilding ?? null);
-      }
-
+      
       // Populate service notes
       if (serviceReport.serviceNotes && serviceReport.serviceNotes.length > 0) {
         setServiceNotesInputs(
@@ -238,22 +224,72 @@ export default function ServiceReportForm({
             notes: sn.serviceNotes,
           }))
         );
+      } else {
+        setServiceNotesInputs([
+          {
+            date: "",
+            technicianTime: "0.0",
+            technicianOvertime: "0.0",
+            helperTime: "0.0",
+            helperOvertime: "0.0",
+            remoteWork: "N",
+            notes: "",
+          },
+        ]);
       }
     }
     initForm();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serviceReport]);
+
+  // Track original contact info for change detection
+  const [originalContact, setOriginalContact] = useState({
+    contactName: serviceReport?.contactName || "",
+    contactEmail: serviceReport?.contactEmail || "",
+    contactPhone: serviceReport?.contactPhone || "",
+  });
+
+  // Detect if contact info has changed
+  const contactChanged =
+    contactName !== originalContact.contactName ||
+    contactEmail !== originalContact.contactEmail ||
+    contactPhone !== originalContact.contactPhone;
+
+  // Handler for saving contact info to Firestore (Building)
+  const handleSaveContact = async () => {
+    if (!client || !building) return;
+    try {
+      // Find the building in the client's buildings array and update its contact info
+      const clientRef = doc(firestore, "clients", client.objectID);
+      const updatedBuildings = client.buildings.map((bld) =>
+        bld.serviceAddress1 === building.serviceAddress1
+          ? {
+              "service-address1": serviceAddress1,
+              "service-address2": serviceAddress2,
+              "city-state-zip": cityStateZip,
+              "contact-name": contactName,
+              "contact-email": contactEmail,
+              "contact-phone": contactPhone,
+            }
+          : bld
+      );
+      await updateDoc(clientRef, { buildings: updatedBuildings });
+      setOriginalContact({ contactName, contactEmail, contactPhone });
+      toast.success("Contact information saved!");
+    } catch {
+      toast.error("Failed to save contact information");
+    }
+  };
 
   const handleAddServiceNote = () => {
     setServiceNotesInputs((prev) => [
       ...prev,
       {
         date: "",
-        technicianTime: "",
-        technicianOvertime: "",
-        helperTime: "",
-        helperOvertime: "",
-        remoteWork: "",
+        technicianTime: "0.0",
+        technicianOvertime: "0.0",
+        helperTime: "0.0",
+        helperOvertime: "0.0",
+        remoteWork: "N",
         notes: "",
       },
     ]);
@@ -288,24 +324,13 @@ export default function ServiceReportForm({
     setSubmitting(false);
   };
 
-  // Add state for dialog and new building form
-  const [addBuildingOpen, setAddBuildingOpen] = useState(false);
-  const [newBuilding, setNewBuilding] = useState({
-    serviceAddress1: "",
-    serviceAddress2: "",
-    cityStateZip: "",
-    contactName: "",
-    contactEmail: "",
-    contactPhone: "",
-  });
-
   const handleNewBuildingChange = (field: string, value: string) => {
     setNewBuilding((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleAddBuilding = (e: FormEvent) => {
     e.preventDefault();
-    // TODO: Replace with actual create logic
+
     setAddBuildingOpen(false);
     setNewBuilding({
       serviceAddress1: "",
@@ -367,10 +392,6 @@ export default function ServiceReportForm({
                 <Select
                   value={building ? building.serviceAddress1 : ""}
                   onValueChange={(val) => {
-                    if (val === "__create__") {
-                      toast.info("Create Building dialog not implemented");
-                      return;
-                    }
                     if (val === "") {
                       setBuilding(null);
                       setContactName("");
@@ -394,26 +415,37 @@ export default function ServiceReportForm({
                       setServiceAddress1(found.serviceAddress1 ?? "");
                       setServiceAddress2(found.serviceAddress2 ?? "");
                       setCityStateZip(found.cityStateZip ?? "");
+                      // Set as original contact
+                      setOriginalContact({
+                        contactName: found.contactName ?? "",
+                        contactEmail: found.contactEmail ?? "",
+                        contactPhone: found.contactPhone ?? "",
+                      });
                     }
                   }}
                 >
-                  <SelectTrigger id="buildingSelect">
+                  <SelectTrigger id="buildingSelect" className="max-w-[400px] w-full">
                     <SelectValue placeholder="Select a building..." />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
                       <SelectLabel>Buildings</SelectLabel>
-                      {client.buildings.map((bld) => (
-                        bld.serviceAddress1 !== "" && (
-                          <SelectItem
-                            key={bld.serviceAddress1}
-                            value={bld.serviceAddress1}
-                            className="py-2"
-                          >
-                            {bld.serviceAddress1}
-                          </SelectItem>
-                        )
-                      ))}
+                      {client.buildings.map(
+                        (bld) =>
+                          bld.serviceAddress1 !== "" && (
+                            <SelectItem
+                              key={
+                                bld.serviceAddress1 +
+                                (bld.contactEmail || "") +
+                                (bld.contactPhone || "")
+                              }
+                              value={bld.serviceAddress1}
+                              className="py-2"
+                            >
+                              {bld.serviceAddress1}
+                            </SelectItem>
+                          )
+                      )}
                     </SelectGroup>
                   </SelectContent>
                 </Select>
@@ -427,11 +459,7 @@ export default function ServiceReportForm({
             )}
             <Dialog open={addBuildingOpen} onOpenChange={setAddBuildingOpen}>
               <DialogTrigger asChild>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="w-fit"
-                >
+                <Button type="button" variant="secondary" className="w-fit">
                   + Add Building
                 </Button>
               </DialogTrigger>
@@ -441,23 +469,33 @@ export default function ServiceReportForm({
                 </DialogHeader>
                 <form onSubmit={handleAddBuilding} className="space-y-4">
                   <div className="flex flex-col space-y-2">
-                    <Label htmlFor="new_serviceAddress1">Service Address 1</Label>
+                    <Label htmlFor="new_serviceAddress1">
+                      Service Address 1
+                    </Label>
                     <Input
                       id="new_serviceAddress1"
                       value={newBuilding.serviceAddress1}
                       onChange={(e) =>
-                        handleNewBuildingChange("serviceAddress1", e.target.value)
+                        handleNewBuildingChange(
+                          "serviceAddress1",
+                          e.target.value
+                        )
                       }
                       required
                     />
                   </div>
                   <div className="flex flex-col space-y-2">
-                    <Label htmlFor="new_serviceAddress2">Service Address 2</Label>
+                    <Label htmlFor="new_serviceAddress2">
+                      Service Address 2
+                    </Label>
                     <Input
                       id="new_serviceAddress2"
                       value={newBuilding.serviceAddress2}
                       onChange={(e) =>
-                        handleNewBuildingChange("serviceAddress2", e.target.value)
+                        handleNewBuildingChange(
+                          "serviceAddress2",
+                          e.target.value
+                        )
                       }
                     />
                   </div>
@@ -507,9 +545,13 @@ export default function ServiceReportForm({
                     />
                   </div>
                   <DialogFooter>
-                    <Button type="submit" variant="default">Add Building</Button>
+                    <Button type="submit" variant="default">
+                      Add Building
+                    </Button>
                     <DialogClose asChild>
-                      <Button type="button" variant="outline">Cancel</Button>
+                      <Button type="button" variant="outline">
+                        Cancel
+                      </Button>
                     </DialogClose>
                   </DialogFooter>
                 </form>
@@ -519,64 +561,77 @@ export default function ServiceReportForm({
         )}
 
         {/* === Contact & Address Fields (always editable, visually separated) === */}
-        <div className="flex flex-col gap-4 p-4 mt-4 mb-2 border rounded-lg bg-muted/30">
-          <span className="font-semibold text-sm mb-2">Contact Information</span>
-          <div className="flex flex-col space-y-2">
-            <Label htmlFor="contactName">Contact Name</Label>
-            <Input
-              id="contactName"
-              value={contactName}
-              onChange={(e) => setContactName(e.target.value)}
-              placeholder="Contact Name"
-            />
+        {building && (
+          <div className="flex flex-col gap-4 p-4 mt-4 mb-2 border rounded-lg bg-muted/30">
+            <span className="font-semibold text-sm mb-2">Contact Information</span>
+            <div className="flex flex-col space-y-2">
+              <Label htmlFor="contactName">Contact Name</Label>
+              <Input
+                id="contactName"
+                value={contactName}
+                onChange={(e) => setContactName(e.target.value)}
+                placeholder="Contact Name"
+              />
+            </div>
+            <div className="flex flex-col space-y-2">
+              <Label htmlFor="contactEmail">Contact Email</Label>
+              <Input
+                id="contactEmail"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                placeholder="Contact Email"
+                type="email"
+              />
+            </div>
+            <div className="flex flex-col space-y-2">
+              <Label htmlFor="contactPhone">Contact Phone</Label>
+              <Input
+                id="contactPhone"
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                placeholder="Contact Phone"
+              />
+            </div>
+            <div className="flex flex-col space-y-2">
+              <Label htmlFor="serviceAddress1">Service Address 1</Label>
+              <Input
+                id="serviceAddress1"
+                value={serviceAddress1}
+                onChange={(e) => setServiceAddress1(e.target.value)}
+                placeholder="Address Line 1"
+              />
+            </div>
+            <div className="flex flex-col space-y-2">
+              <Label htmlFor="serviceAddress2">Service Address 2</Label>
+              <Input
+                id="serviceAddress2"
+                value={serviceAddress2}
+                onChange={(e) => setServiceAddress2(e.target.value)}
+                placeholder="Address Line 2"
+              />
+            </div>
+            <div className="flex flex-col space-y-2">
+              <Label htmlFor="cityStateZip">City, State, ZIP</Label>
+              <Input
+                id="cityStateZip"
+                value={cityStateZip}
+                onChange={(e) => setCityStateZip(e.target.value)}
+                placeholder="City, State ZIP"
+              />
+            </div>
+            {/* Save Contact Info Button */}
+            {contactChanged && (
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-fit self-end mt-2"
+                onClick={handleSaveContact}
+              >
+                Save Contact Information
+              </Button>
+            )}
           </div>
-          <div className="flex flex-col space-y-2">
-            <Label htmlFor="contactEmail">Contact Email</Label>
-            <Input
-              id="contactEmail"
-              value={contactEmail}
-              onChange={(e) => setContactEmail(e.target.value)}
-              placeholder="Contact Email"
-              type="email"
-            />
-          </div>
-          <div className="flex flex-col space-y-2">
-            <Label htmlFor="contactPhone">Contact Phone</Label>
-            <Input
-              id="contactPhone"
-              value={contactPhone}
-              onChange={(e) => setContactPhone(e.target.value)}
-              placeholder="Contact Phone"
-            />
-          </div>
-          <div className="flex flex-col space-y-2">
-            <Label htmlFor="serviceAddress1">Service Address 1</Label>
-            <Input
-              id="serviceAddress1"
-              value={serviceAddress1}
-              onChange={(e) => setServiceAddress1(e.target.value)}
-              placeholder="Address Line 1"
-            />
-          </div>
-          <div className="flex flex-col space-y-2">
-            <Label htmlFor="serviceAddress2">Service Address 2</Label>
-            <Input
-              id="serviceAddress2"
-              value={serviceAddress2}
-              onChange={(e) => setServiceAddress2(e.target.value)}
-              placeholder="Address Line 2"
-            />
-          </div>
-          <div className="flex flex-col space-y-2">
-            <Label htmlFor="cityStateZip">City, State, ZIP</Label>
-            <Input
-              id="cityStateZip"
-              value={cityStateZip}
-              onChange={(e) => setCityStateZip(e.target.value)}
-              placeholder="City, State ZIP"
-            />
-          </div>
-        </div>
+        )}
 
         {/* === Material Notes === */}
         <div className="flex flex-col space-y-2">
@@ -618,13 +673,14 @@ export default function ServiceReportForm({
                     <Button
                       variant={note.date ? "outline" : "secondary"}
                       className={
-                        "w-full justify-start text-left font-normal " +
+                        "w-full max-w-[400px] justify-start text-left font-normal flex items-center " +
                         (!note.date ? "text-muted-foreground" : "")
                       }
                     >
-                      {note.date
-                        ? format(parseISO(note.date), "PPP")
-                        : "Pick a date"}
+                      <span className="flex-1 text-left">
+                        {note.date ? format(parseISO(note.date), "PPP") : "Pick a date"}
+                      </span>
+                      <CalendarIcon className="ml-2 w-4 h-4 text-muted-foreground" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
@@ -713,12 +769,13 @@ export default function ServiceReportForm({
                 </Label>
                 <Switch
                   id={`remoteWork_${idx}`}
-                  checked={note.remoteWork === "yes"}
+                  className="cursor-pointer"
+                  checked={note.remoteWork === "Y"}
                   onCheckedChange={(checked: boolean) =>
                     handleServiceNoteChange(
                       idx,
                       "remoteWork",
-                      checked ? "yes" : ""
+                      checked ? "Y" : "N"
                     )
                   }
                 />

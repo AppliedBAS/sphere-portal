@@ -24,6 +24,7 @@
     "@radix-ui/react-switch": "^1.2.5",
     "@radix-ui/react-tabs": "^1.1.12",
     "@radix-ui/react-tooltip": "^1.2.7",
+    "@react-google-maps/api": "^2.20.6",
     "@types/lodash.debounce": "^4.0.9",
     "algoliasearch": "^5.25.0",
     "class-variance-authority": "^0.7.1",
