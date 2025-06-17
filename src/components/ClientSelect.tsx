@@ -1,4 +1,4 @@
-import { ClientHit } from "@/models/Client";
+import { Client, ClientHit } from "@/models/Client";
 import { algoliasearch } from "algoliasearch";
 import { Hit } from "algoliasearch/lite";
 import { debounce } from "lodash";
@@ -18,10 +18,12 @@ import {
 } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
 import { ChevronsUpDown } from "lucide-react";
+import { useServiceReportFormHandlers } from "./useServiceReportFormHandlers";
+import { toast } from "sonner";
 
 interface ClientSelectProps {
-  selectedClient: ClientHit | null;
-  setSelectedClient: (client: ClientHit | null) => void;
+  selectedClient: Client | null;
+  setSelectedClient: (client: Client | null) => void;
 }
 
 export default function ClientSelect({
@@ -32,6 +34,7 @@ export default function ClientSelect({
   const [hits, setHits] = useState<ClientHit[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const { handleFetchClient } = useServiceReportFormHandlers();
 
   // Memoize Algolia client so it's not recreated on every render
   const client = useMemo(
@@ -122,9 +125,17 @@ export default function ClientSelect({
                   <CommandItem
                     key={hit.objectID}
                     onSelect={() => {
-                      setSelectedClient(hit);
                       setQuery(hit.clientName);
                       setOpen(false);
+                      handleFetchClient(hit.objectID)
+                        .then((client) => {
+                          setSelectedClient(client);
+                        })
+                        .catch((error) => {
+                          toast.error("Failed to fetch client details");
+                          console.error("Fetch client error:", error);
+                        });
+                      
                     }}
                   >
                     {hit.clientName}
