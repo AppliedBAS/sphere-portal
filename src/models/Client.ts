@@ -64,6 +64,4 @@ export const clientConverter: FirestoreDataConverter<Client> = {
 export interface ClientHit {
     objectID: string;
     clientName: string;
-    active: boolean;
-    buildings: Building[];
 }
