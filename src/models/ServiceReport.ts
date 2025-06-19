@@ -5,6 +5,7 @@ export interface ServiceReport {
     id: string;
     authorTechnicianRef: DocumentReference;
     assignedTechnicianRef?: DocumentReference;
+    assignedTechnicianRef?: DocumentReference;
     cityStateZip: string;
     clientName: string;
     contactEmail: string;
