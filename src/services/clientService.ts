@@ -21,6 +21,21 @@ export async function searchClients(query: string): Promise<ClientHit[]> {
     const mappedHits: ClientHit[] = hits.map((hit: Hit) => ({
         objectID: hit.objectID,
         clientName: hit["client-name"] as string,
+        buildings: Array.isArray(hit.buildings) ? hit.buildings.map((bld: {
+            "city-state-zip": string;
+            "contact-email": string;
+            "contact-phone": string;
+            "contact-name": string;
+            "service-address1": string;
+            "service-address2": string;
+        }) => ({
+            cityStateZip: bld["city-state-zip"],
+            contactEmail: bld["contact-email"],
+            contactPhone: bld["contact-phone"],
+            contactName: bld["contact-name"],
+            serviceAddress1: bld["service-address1"],
+            serviceAddress2: bld["service-address2"]
+        })) : [],
     }));
   return mappedHits;
 }

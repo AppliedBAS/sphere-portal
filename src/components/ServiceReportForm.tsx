@@ -8,11 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useEmployees } from "@/hooks/useEmployees";
-import { ServiceReport } from "@/models/ServiceReport";
+import { ServiceReport, serviceReportConverter } from "@/models/ServiceReport";
 import {
+  addDoc,
   arrayUnion,
   DocumentData,
   getDoc,
+  setDoc,
   Timestamp,
 } from "firebase/firestore";
 import ClientSelect from "./ClientSelect";
@@ -58,6 +60,7 @@ import {
 import { firestore } from "@/lib/firebase";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { reserveDocid } from "@/services/reportService";
 
 interface ServiceReportFormProps {
   serviceReport?: ServiceReport;
@@ -82,13 +85,13 @@ export default function ServiceReportForm({
     error: employeesError,
     refetch: refetchEmployees,
   } = useEmployees();
+
   const { user } = useAuth();
-  const [loading, setLoading] = useState<boolean>(false);
   const [isNewReport, setIsNewReport] = useState<boolean>(!serviceReport);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
-    const [authorTechnician, setAuthorTechnician] =
-        useState<EmployeeModel | null>(null);
+  const [authorTechnician, setAuthorTechnician] =
+    useState<EmployeeModel | null>(null);
   const [assignedTechnician, setAssignedTechnician] =
     useState<EmployeeModel | null>(null);
 
@@ -188,7 +191,6 @@ export default function ServiceReportForm({
           const clientHit: ClientHit = {
             objectID: docSnap.id,
             clientName: data["name"],
-            active: data.active,
             buildings: Array.isArray(data.buildings)
               ? data.buildings.map((bld: DocumentData) => ({
                   serviceAddress1: bld["service-address1"],
@@ -299,44 +301,127 @@ export default function ServiceReportForm({
   const handleSaveDraft = async () => {
     setSubmitting(true);
 
-    // search for current user's employee document
     if (!user) {
-        return;
+      return;
     }
 
-    
-    
+    if (!authorTechnician) {
+      toast.error("Error loading author technician. Try again later.");
+      setSubmitting(false);
+      return;
+    }
+
+    if (!client) {
+      toast.error("Please select a client before saving the draft.");
+      setSubmitting(false);
+      return;
+    }
+
+    if (!building) {
+      toast.error("Please select a building before saving the draft.");
+      setSubmitting(false);
+      return;
+    }
+
+    if (serviceNotesInputs.length === 0) {
+      toast.error(
+        "Please add at least one service note before saving the draft."
+      );
+      setSubmitting(false);
+      return;
+    }
 
     try {
       // Create a new service report object
       if (isNewReport) {
+        // get new id
+        const docId = await reserveDocid();
+        // create new document reference
+        const newServiceReport: ServiceReport = {
+          id: crypto.randomUUID(),
+          docId: docId,
+          authorTechnicianRef: doc(
+            firestore,
+            "employees",
+            authorTechnician!.id
+          ),
+          assignedTechnicianRef: assignedTechnician
+            ? doc(firestore, "employees", assignedTechnician.id)
+            : null,
+          clientName: client.clientName,
+          serviceAddress1: building.serviceAddress1,
+          serviceAddress2: building.serviceAddress2,
+          cityStateZip: building.cityStateZip,
+          contactName: building.contactName,
+          contactEmail: building.contactEmail,
+          contactPhone: building.contactPhone,
+          materialNotes,
+          serviceNotes: serviceNotesInputs.map((note) => ({
+            date: note.date
+              ? Timestamp.fromDate(new Date(note.date))
+              : Timestamp.now(),
+            technicianTime: note.technicianTime,
+            technicianOvertime: note.technicianOvertime,
+            helperTime: note.helperTime,
+            helperOvertime: note.helperOvertime,
+            remoteWork: note.remoteWork,
+            serviceNotes: note.notes,
+          })),
+          createdAt: Timestamp.now(),
+          dateSigned: null,
+          draft: true,
+          printedName: "",
+        };
 
+        // create new document reference
+        await addDoc(
+          collection(firestore, "reports").withConverter(
+            serviceReportConverter
+          ),
+          newServiceReport
+        );
+      } else {
+        // use existing serviceReport.id
+        const serviceReportRef = doc(
+          firestore,
+          "reports",
+          serviceReport!.id
+        ).withConverter(serviceReportConverter);
+        // update existing document
+        const serviceReportData: ServiceReport = {
+          id: serviceReport!.id,
+          docId: serviceReport!.docId,
+          createdAt: serviceReport!.createdAt,
+          dateSigned: serviceReport!.dateSigned,
+          draft: true,
+          printedName: serviceReport!.printedName,
+          authorTechnicianRef: serviceReport!.authorTechnicianRef,
+          assignedTechnicianRef: assignedTechnician
+            ? doc(firestore, "employees", assignedTechnician.id)
+            : null,
+          clientName: client.clientName,
+          serviceAddress1: building.serviceAddress1,
+          serviceAddress2: building.serviceAddress2,
+          cityStateZip: building.cityStateZip,
+          contactName: building.contactName,
+          contactEmail: building.contactEmail,
+          contactPhone: building.contactPhone,
+          materialNotes,
+          serviceNotes: serviceNotesInputs.map((note) => ({
+            date: note.date
+              ? Timestamp.fromDate(new Date(note.date))
+              : Timestamp.now(),
+            technicianTime: note.technicianTime,
+            technicianOvertime: note.technicianOvertime,
+            helperTime: note.helperTime,
+            helperOvertime: note.helperOvertime,
+            remoteWork: note.remoteWork,
+            serviceNotes: note.notes,
+          })),
+        };
+
+        await setDoc(serviceReportRef, serviceReportData)
       }
-      const serviceReportRef = doc(collection(firestore, "reports"));
-      const newReport: ServiceReport = {
-        authorTechnicianRef: authorTechnician
-          ? doc(firestore, "employees", authorTechnician.id)
-          : doc(),
-        clientName: client ? client.clientName : "",
-        serviceAddress1: building ? building.serviceAddress1 : "",
-        serviceAddress2: building ? building.serviceAddress2 : "",
-        cityStateZip: building ? building.cityStateZip : "",
-        contactName: building ? building.contactName : "",
-        contactEmail: building ? building.contactEmail : "",
-        contactPhone: building ? building.contactPhone : "",
-        materialNotes,
-        serviceNotes: serviceNotesInputs.map((note) => ({
-          date: Timestamp.fromDate(new Date(note.date)),
-          technicianTime: note.technicianTime,
-          technicianOvertime: note.technicianOvertime,
-          helperTime: note.helperTime,
-          helperOvertime: note.helperOvertime,
-          remoteWork: note.remoteWork,
-          serviceNotes: note.notes,
-        })),
-      };
-
-
 
       setIsNewReport(false);
       setSubmitting(false);
@@ -401,8 +486,12 @@ export default function ServiceReportForm({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    toast.success("Tested submission");
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    
+    if (contactChanged) {
+      toast.error("Please save the contact information changes before submitting.");
+      setSubmitting(false);
+      return;
+    }
     setSubmitting(false);
   };
 

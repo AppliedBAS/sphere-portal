@@ -1,11 +1,10 @@
-import { DocumentData, DocumentReference, DocumentSnapshot, Timestamp } from "firebase/firestore";
+import { DocumentData, DocumentReference, DocumentSnapshot, FirestoreDataConverter, Timestamp } from "firebase/firestore";
 
 
 export interface ServiceReport {
     id: string;
     authorTechnicianRef: DocumentReference;
-    assignedTechnicianRef?: DocumentReference;
-    assignedTechnicianRef?: DocumentReference;
+    assignedTechnicianRef: DocumentReference | null;
     cityStateZip: string;
     clientName: string;
     contactEmail: string;
@@ -13,16 +12,16 @@ export interface ServiceReport {
     contactName: string;
     createdAt: Timestamp;
     docId: number;
-    dateSigned?: Timestamp;
+    dateSigned: Timestamp | null;
     draft: boolean;
     materialNotes: string;
     printedName: string;
     serviceAddress1: string;
-    serviceAddress2: string;
+    serviceAddress2: string | null;
     serviceNotes: ServiceNote[];
 }
 
-export const serviceReportConverter = {
+export const serviceReportConverter: FirestoreDataConverter<ServiceReport> = {
   toFirestore(report: ServiceReport) {
     return {
       "author-technician-ref": report.authorTechnicianRef,
@@ -41,14 +40,14 @@ export const serviceReportConverter = {
       "service-address1": report.serviceAddress1,
       "service-address2": report.serviceAddress2,
       "service-notes": report.serviceNotes.map((note) => ({
-        date: note.date,
-        "helper-overtime": note.helperOvertime,
-        "helper-time": note.helperTime,
-        "remote-work": note.remoteWork,
-        "service-notes": note.serviceNotes,
-        "technician-overtime": note.technicianOvertime,
-        "technician-time": note.technicianTime,
-      })),
+            date: note.date,
+            "helper-overtime": note.helperOvertime,
+            "helper-time": note.helperTime,
+            "remote-work": note.remoteWork,
+            "service-notes": note.serviceNotes,
+            "technician-overtime": note.technicianOvertime,
+            "technician-time": note.technicianTime,
+          }))
     };
   },
   fromFirestore(
