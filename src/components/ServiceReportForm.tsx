@@ -9,7 +9,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useEmployees } from "@/hooks/useEmployees";
 import { ServiceReport } from "@/models/ServiceReport";
-import { getDoc } from "firebase/firestore";
+import {
+  arrayUnion,
+  DocumentData,
+  getDoc,
+  Timestamp,
+} from "firebase/firestore";
 import ClientSelect from "./ClientSelect";
 import { Building, ClientHit } from "@/models/Client";
 import { toast } from "sonner";
@@ -52,6 +57,7 @@ import {
 } from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
 import { Calendar as CalendarIcon } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ServiceReportFormProps {
   serviceReport?: ServiceReport;
@@ -76,10 +82,13 @@ export default function ServiceReportForm({
     error: employeesError,
     refetch: refetchEmployees,
   } = useEmployees();
-
+  const { user } = useAuth();
+  const [loading, setLoading] = useState<boolean>(false);
+  const [isNewReport, setIsNewReport] = useState<boolean>(!serviceReport);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
-  // If editing, prefill the assigned technician
+    const [authorTechnician, setAuthorTechnician] =
+        useState<EmployeeModel | null>(null);
   const [assignedTechnician, setAssignedTechnician] =
     useState<EmployeeModel | null>(null);
 
@@ -88,29 +97,12 @@ export default function ServiceReportForm({
 
   // The chosen building (we’ll identify by serviceAddress1)
   const [building, setBuilding] = useState<Building | null>(null);
-  const [contactName, setContactName] = useState<string>(
-    serviceReport?.contactName || ""
-  );
-  const [contactEmail, setContactEmail] = useState<string>(
-    serviceReport?.contactEmail || ""
-  );
-  const [contactPhone, setContactPhone] = useState<string>(
-    serviceReport?.contactPhone || ""
-  );
-  const [serviceAddress1, setServiceAddress1] = useState<string>(
-    serviceReport?.serviceAddress1 || ""
-  );
-  const [serviceAddress2, setServiceAddress2] = useState<string>(
-    serviceReport?.serviceAddress2 || ""
-  );
-  const [cityStateZip, setCityStateZip] = useState<string>(
-    serviceReport?.cityStateZip || ""
-  );
+
   const [materialNotes, setMaterialNotes] = useState<string>(
     serviceReport?.materialNotes || ""
   );
 
-    // Add state for dialog and new building form
+  // Add state for dialog and new building form
   const [addBuildingOpen, setAddBuildingOpen] = useState(false);
   const [newBuilding, setNewBuilding] = useState({
     serviceAddress1: "",
@@ -151,9 +143,24 @@ export default function ServiceReportForm({
     async function initForm() {
       if (!serviceReport) return;
 
-      // Populate assignedTechnician from a DocumentReference, if present
+      // Populate authorTechnician from a DocumentReference, if present
       if (serviceReport.authorTechnicianRef) {
         const empSnap = await getDoc(serviceReport.authorTechnicianRef);
+        if (empSnap.exists()) {
+          const data = empSnap.data();
+          setAuthorTechnician({
+            id: empSnap.id,
+            clientId: data["client-id"],
+            clientSecret: data["client-secret"],
+            createdAt: data["created-at"],
+            updatedAt: data["updated-at"],
+            ...data,
+          } as EmployeeModel);
+        }
+      }
+
+      if (serviceReport.assignedTechnicianRef) {
+        const empSnap = await getDoc(serviceReport.assignedTechnicianRef);
         if (empSnap.exists()) {
           const data = empSnap.data();
           setAssignedTechnician({
@@ -183,7 +190,7 @@ export default function ServiceReportForm({
             clientName: data["name"],
             active: data.active,
             buildings: Array.isArray(data.buildings)
-              ? data.buildings.map((bld: any) => ({
+              ? data.buildings.map((bld: DocumentData) => ({
                   serviceAddress1: bld["service-address1"],
                   serviceAddress2: bld["service-address2"],
                   cityStateZip: bld["city-state-zip"],
@@ -202,15 +209,9 @@ export default function ServiceReportForm({
           setBuilding(foundBuilding ?? null);
         }
       }
-      // Populate all fields from the serviceReport
-      setContactName(serviceReport.contactName || "");
-      setContactEmail(serviceReport.contactEmail || "");
-      setContactPhone(serviceReport.contactPhone || "");
-      setServiceAddress1(serviceReport.serviceAddress1 || "");
-      setServiceAddress2(serviceReport.serviceAddress2 || "");
-      setCityStateZip(serviceReport.cityStateZip || "");
+
       setMaterialNotes(serviceReport.materialNotes || "");
-      
+
       // Populate service notes
       if (serviceReport.serviceNotes && serviceReport.serviceNotes.length > 0) {
         setServiceNotesInputs(
@@ -250,9 +251,9 @@ export default function ServiceReportForm({
 
   // Detect if contact info has changed
   const contactChanged =
-    contactName !== originalContact.contactName ||
-    contactEmail !== originalContact.contactEmail ||
-    contactPhone !== originalContact.contactPhone;
+    building?.contactName !== originalContact.contactName ||
+    building?.contactEmail !== originalContact.contactEmail ||
+    building?.contactPhone !== originalContact.contactPhone;
 
   // Handler for saving contact info to Firestore (Building)
   const handleSaveContact = async () => {
@@ -260,24 +261,105 @@ export default function ServiceReportForm({
     try {
       // Find the building in the client's buildings array and update its contact info
       const clientRef = doc(firestore, "clients", client.objectID);
-      const updatedBuildings = client.buildings.map((bld) =>
-        bld.serviceAddress1 === building.serviceAddress1
-          ? {
-              "service-address1": serviceAddress1,
-              "service-address2": serviceAddress2,
-              "city-state-zip": cityStateZip,
-              "contact-name": contactName,
-              "contact-email": contactEmail,
-              "contact-phone": contactPhone,
-            }
-          : bld
-      );
+      const updatedBuildings = client.buildings.map((bld) => {
+        if (
+          bld.serviceAddress1 === building.serviceAddress1 &&
+          bld.serviceAddress2 === building.serviceAddress2
+        ) {
+          return {
+            "service-address1": building.serviceAddress1,
+            "service-address2": building.serviceAddress2,
+            "city-state-zip": building.cityStateZip,
+            "contact-name": building.contactName,
+            "contact-email": building.contactEmail,
+            "contact-phone": building.contactPhone,
+          };
+        }
+        return {
+          "service-address1": bld.serviceAddress1,
+          "service-address2": bld.serviceAddress2,
+          "city-state-zip": bld.cityStateZip,
+          "contact-name": bld.contactName,
+          "contact-email": bld.contactEmail,
+          "contact-phone": bld.contactPhone,
+        };
+      });
       await updateDoc(clientRef, { buildings: updatedBuildings });
-      setOriginalContact({ contactName, contactEmail, contactPhone });
+      setOriginalContact({
+        contactName: building.contactName,
+        contactEmail: building.contactEmail,
+        contactPhone: building.contactPhone,
+      });
       toast.success("Contact information saved!");
     } catch {
       toast.error("Failed to save contact information");
     }
+  };
+
+  const handleSaveDraft = async () => {
+    setSubmitting(true);
+
+    // search for current user's employee document
+    if (!user) {
+        return;
+    }
+
+    
+    
+
+    try {
+      // Create a new service report object
+      if (isNewReport) {
+
+      }
+      const serviceReportRef = doc(collection(firestore, "reports"));
+      const newReport: ServiceReport = {
+        authorTechnicianRef: authorTechnician
+          ? doc(firestore, "employees", authorTechnician.id)
+          : doc(),
+        clientName: client ? client.clientName : "",
+        serviceAddress1: building ? building.serviceAddress1 : "",
+        serviceAddress2: building ? building.serviceAddress2 : "",
+        cityStateZip: building ? building.cityStateZip : "",
+        contactName: building ? building.contactName : "",
+        contactEmail: building ? building.contactEmail : "",
+        contactPhone: building ? building.contactPhone : "",
+        materialNotes,
+        serviceNotes: serviceNotesInputs.map((note) => ({
+          date: Timestamp.fromDate(new Date(note.date)),
+          technicianTime: note.technicianTime,
+          technicianOvertime: note.technicianOvertime,
+          helperTime: note.helperTime,
+          helperOvertime: note.helperOvertime,
+          remoteWork: note.remoteWork,
+          serviceNotes: note.notes,
+        })),
+      };
+
+
+
+      setIsNewReport(false);
+      setSubmitting(false);
+
+      toast.success("Draft saved successfully!");
+    } catch (error) {
+      console.error("Error saving draft:", error);
+      toast.error("Failed to save draft");
+    }
+  };
+
+  // New: cancel unsaved contact edits
+  const handleCancelContact = () => {
+    setBuilding((prev) =>
+      prev
+        ? {
+            ...prev,
+            contactName: originalContact.contactName,
+            contactEmail: originalContact.contactEmail,
+            contactPhone: originalContact.contactPhone,
+          }
+        : null
+    );
   };
 
   const handleAddServiceNote = () => {
@@ -328,9 +410,56 @@ export default function ServiceReportForm({
     setNewBuilding((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleAddBuilding = (e: FormEvent) => {
+  // Helper to format US phone numbers as XXX-XXX-XXXX and strip non-digits
+  const formatPhone = (value: string) => {
+    const digits = value.replace(/\D/g, "");
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+  };
+
+  const handleAddBuilding = async (e: FormEvent) => {
     e.preventDefault();
 
+    // Handle adding the new building
+    const newBuildingData: DocumentData = {
+      "service-address1": newBuilding.serviceAddress1,
+      "service-address2": newBuilding.serviceAddress2,
+      "city-state-zip": newBuilding.cityStateZip,
+      "contact-name": newBuilding.contactName,
+      "contact-email": newBuilding.contactEmail,
+      "contact-phone": newBuilding.contactPhone,
+    };
+
+    const docRef = doc(firestore, "clients", client!.objectID);
+    try {
+      await updateDoc(docRef, {
+        ["buildings"]: arrayUnion(newBuildingData),
+      });
+      toast.success("Building added successfully!");
+    } catch (error) {
+      console.error("Error adding building: ", error);
+    }
+
+    // Optionally, you could also update the client state to include this new building
+    setClient((prev) => {
+      if (!prev) return null;
+      // Convert newBuildingData (Firestore field names) to Building type
+      const newBuildingObj: Building = {
+        serviceAddress1: newBuildingData["service-address1"],
+        serviceAddress2: newBuildingData["service-address2"],
+        cityStateZip: newBuildingData["city-state-zip"],
+        contactName: newBuildingData["contact-name"],
+        contactEmail: newBuildingData["contact-email"],
+        contactPhone: newBuildingData["contact-phone"],
+      };
+      return {
+        ...prev,
+        buildings: [...(prev.buildings || []), newBuildingObj],
+      };
+    });
+
+    // Reset the form
     setAddBuildingOpen(false);
     setNewBuilding({
       serviceAddress1: "",
@@ -340,7 +469,6 @@ export default function ServiceReportForm({
       contactEmail: "",
       contactPhone: "",
     });
-    toast.success("Building creation not implemented");
   };
 
   return (
@@ -373,12 +501,6 @@ export default function ServiceReportForm({
 
               // Clear any previously selected building and all its dependent fields:
               setBuilding(null);
-              setContactName("");
-              setContactEmail("");
-              setContactPhone("");
-              setServiceAddress1("");
-              setServiceAddress2("");
-              setCityStateZip("");
             }}
           />
         </div>
@@ -394,12 +516,6 @@ export default function ServiceReportForm({
                   onValueChange={(val) => {
                     if (val === "") {
                       setBuilding(null);
-                      setContactName("");
-                      setContactEmail("");
-                      setContactPhone("");
-                      setServiceAddress1("");
-                      setServiceAddress2("");
-                      setCityStateZip("");
                       return;
                     }
 
@@ -409,12 +525,6 @@ export default function ServiceReportForm({
 
                     if (found) {
                       setBuilding(found);
-                      setContactName(found.contactName ?? "");
-                      setContactEmail(found.contactEmail ?? "");
-                      setContactPhone(found.contactPhone ?? "");
-                      setServiceAddress1(found.serviceAddress1 ?? "");
-                      setServiceAddress2(found.serviceAddress2 ?? "");
-                      setCityStateZip(found.cityStateZip ?? "");
                       // Set as original contact
                       setOriginalContact({
                         contactName: found.contactName ?? "",
@@ -424,7 +534,10 @@ export default function ServiceReportForm({
                     }
                   }}
                 >
-                  <SelectTrigger id="buildingSelect" className="max-w-[400px] w-full">
+                  <SelectTrigger
+                    id="buildingSelect"
+                    className="max-w-[400px] w-full"
+                  >
                     <SelectValue placeholder="Select a building..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -538,9 +651,13 @@ export default function ServiceReportForm({
                     <Input
                       id="new_contactPhone"
                       value={newBuilding.contactPhone}
-                      onChange={(e) =>
-                        handleNewBuildingChange("contactPhone", e.target.value)
-                      }
+                      onChange={(e) => {
+                        const formatted = formatPhone(e.target.value);
+                        handleNewBuildingChange("contactPhone", formatted);
+                      }}
+                      type="tel"
+                      pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}"
+                      maxLength={12}
                       required
                     />
                   </div>
@@ -563,13 +680,24 @@ export default function ServiceReportForm({
         {/* === Contact & Address Fields (always editable, visually separated) === */}
         {building && (
           <div className="flex flex-col gap-4 p-4 mt-4 mb-2 border rounded-lg bg-muted/30">
-            <span className="font-semibold text-sm mb-2">Contact Information</span>
+            <span className="font-semibold text-sm mb-2">
+              Contact Information
+            </span>
             <div className="flex flex-col space-y-2">
               <Label htmlFor="contactName">Contact Name</Label>
               <Input
                 id="contactName"
-                value={contactName}
-                onChange={(e) => setContactName(e.target.value)}
+                value={building.contactName}
+                onChange={(e) =>
+                  setBuilding((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          contactName: e.target.value,
+                        }
+                      : null
+                  )
+                }
                 placeholder="Contact Name"
               />
             </div>
@@ -577,8 +705,17 @@ export default function ServiceReportForm({
               <Label htmlFor="contactEmail">Contact Email</Label>
               <Input
                 id="contactEmail"
-                value={contactEmail}
-                onChange={(e) => setContactEmail(e.target.value)}
+                value={building.contactEmail}
+                onChange={(e) =>
+                  setBuilding((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          contactEmail: e.target.value,
+                        }
+                      : null
+                  )
+                }
                 placeholder="Contact Email"
                 type="email"
               />
@@ -587,48 +724,37 @@ export default function ServiceReportForm({
               <Label htmlFor="contactPhone">Contact Phone</Label>
               <Input
                 id="contactPhone"
-                value={contactPhone}
-                onChange={(e) => setContactPhone(e.target.value)}
+                value={building.contactPhone}
+                onChange={(e) => {
+                  const formatted = formatPhone(e.target.value);
+                  setBuilding((prev) =>
+                    prev ? { ...prev, contactPhone: formatted } : null
+                  );
+                }}
+                type="tel"
+                pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}"
+                maxLength={12}
                 placeholder="Contact Phone"
               />
             </div>
-            <div className="flex flex-col space-y-2">
-              <Label htmlFor="serviceAddress1">Service Address 1</Label>
-              <Input
-                id="serviceAddress1"
-                value={serviceAddress1}
-                onChange={(e) => setServiceAddress1(e.target.value)}
-                placeholder="Address Line 1"
-              />
-            </div>
-            <div className="flex flex-col space-y-2">
-              <Label htmlFor="serviceAddress2">Service Address 2</Label>
-              <Input
-                id="serviceAddress2"
-                value={serviceAddress2}
-                onChange={(e) => setServiceAddress2(e.target.value)}
-                placeholder="Address Line 2"
-              />
-            </div>
-            <div className="flex flex-col space-y-2">
-              <Label htmlFor="cityStateZip">City, State, ZIP</Label>
-              <Input
-                id="cityStateZip"
-                value={cityStateZip}
-                onChange={(e) => setCityStateZip(e.target.value)}
-                placeholder="City, State ZIP"
-              />
-            </div>
-            {/* Save Contact Info Button */}
+            {/* Save/Cancel Contact Buttons */}
             {contactChanged && (
-              <Button
-                type="button"
-                variant="secondary"
-                className="w-fit self-end mt-2"
-                onClick={handleSaveContact}
-              >
-                Save Contact Information
-              </Button>
+              <div className="flex gap-2 self-end mt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCancelContact}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleSaveContact}
+                >
+                  Save Contact Information
+                </Button>
+              </div>
             )}
           </div>
         )}
@@ -678,7 +804,9 @@ export default function ServiceReportForm({
                       }
                     >
                       <span className="flex-1 text-left">
-                        {note.date ? format(parseISO(note.date), "PPP") : "Pick a date"}
+                        {note.date
+                          ? format(parseISO(note.date), "PPP")
+                          : "Pick a date"}
                       </span>
                       <CalendarIcon className="ml-2 w-4 h-4 text-muted-foreground" />
                     </Button>
@@ -818,10 +946,7 @@ export default function ServiceReportForm({
             type="button"
             disabled={submitting}
             variant="outline"
-            onClick={() => {
-              // Implement save‐draft logic
-              toast.info("Saved as draft (not implemented)");
-            }}
+            onClick={handleSaveDraft}
           >
             Save
           </Button>

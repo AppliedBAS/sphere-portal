@@ -1,9 +1,10 @@
-import { DocumentReference, Timestamp } from "firebase/firestore";
+import { DocumentData, DocumentReference, FirestoreDataConverter, QueryDocumentSnapshot, Timestamp } from "firebase/firestore";
 
 
 export interface ServiceReport {
     id: string;
     authorTechnicianRef: DocumentReference;
+    assignedTechnicianRef?: DocumentReference;
     cityStateZip: string;
     clientName: string;
     contactEmail: string;
@@ -19,6 +20,57 @@ export interface ServiceReport {
     serviceAddress2: string;
     serviceNotes: ServiceNote[];
 }
+
+export const serviceReportConverter: FirestoreDataConverter<ServiceReport> = {
+  toFirestore(report: ServiceReport): DocumentData {
+    return {
+      "author-technician-ref": report.authorTechnicianRef,
+      "city-state-zip": report.cityStateZip,
+      "client-name": report.clientName,
+      "contact-email": report.contactEmail,
+      "contact-phone": report.contactPhone,
+      "contact-name": report.contactName,
+      "created-at": report.createdAt,
+      "doc-id": report.docId,
+      "date-signed": report.dateSigned || null,
+      draft: report.draft,
+      "material-notes": report.materialNotes,
+      "printed-name": report.printedName,
+      "service-address1": report.serviceAddress1,
+      "service-address2": report.serviceAddress2,
+      "service-notes": report.serviceNotes.map(note => ({
+        date: note.date,
+        "helper-overtime": note.helperOvertime,
+        "helper-time": note.helperTime,
+        "remote-work": note.remoteWork,
+        "service-notes": note.serviceNotes,
+        "technician-overtime": note.technicianOvertime,
+        "technician-time": note.technicianTime,
+      }))
+    };
+  },
+  fromFirestore(snapshot: QueryDocumentSnapshot): ServiceReport {
+    const data = snapshot.data();
+    return {
+      id: snapshot.id,
+      authorTechnicianRef: data["author-technician-ref"],
+      cityStateZip: data["city-state-zip"],
+      clientName: data["client-name"],
+      contactEmail: data["contact-email"],
+      contactPhone: data["contact-phone"],
+      contactName: data["contact-name"],
+      createdAt: data["created-at"],
+      docId: data["doc-id"],
+      dateSigned: data["date-signed"] || null,
+      draft: data.draft,
+      materialNotes: data["material-notes"],
+      printedName: data["printed-name"],
+      serviceAddress1: data["service-address1"],
+      serviceAddress2: data["service-address2"],
+      serviceNotes: data["service-notes"]
+    };
+  }
+};
 
 export interface ServiceNote {
     date: Timestamp;
