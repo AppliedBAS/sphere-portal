@@ -28,7 +28,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { format, parseISO } from "date-fns";
 import {
   Dialog,
   DialogTrigger,
@@ -67,7 +66,7 @@ interface ServiceReportFormProps {
 }
 
 interface ServiceNoteInput {
-  date: string;
+  date: Date;
   technicianTime: string;
   technicianOvertime: string;
   helperTime: string;
@@ -121,7 +120,7 @@ export default function ServiceReportForm({
     ServiceNoteInput[]
   >(
     serviceReport?.serviceNotes.map((sn) => ({
-      date: sn.date.toDate().toISOString().substring(0, 10),
+      date: sn.date.toDate(),
       technicianTime: sn.technicianTime,
       technicianOvertime: sn.technicianOvertime,
       helperTime: sn.helperTime,
@@ -130,12 +129,12 @@ export default function ServiceReportForm({
       notes: sn.serviceNotes,
     })) || [
       {
-        date: "",
+        date: new Date(),
         technicianTime: "0.0",
         technicianOvertime: "0.0",
         helperTime: "0.0",
         helperOvertime: "0.0",
-        remoteWork: "Y",
+        remoteWork: "N",
         notes: "",
       },
     ]
@@ -218,7 +217,7 @@ export default function ServiceReportForm({
       if (serviceReport.serviceNotes && serviceReport.serviceNotes.length > 0) {
         setServiceNotesInputs(
           serviceReport.serviceNotes.map((sn) => ({
-            date: sn.date.toDate().toISOString().substring(0, 10),
+            date: sn.date.toDate(),
             technicianTime: sn.technicianTime,
             technicianOvertime: sn.technicianOvertime,
             helperTime: sn.helperTime,
@@ -230,7 +229,7 @@ export default function ServiceReportForm({
       } else {
         setServiceNotesInputs([
           {
-            date: "",
+            date: new Date(),
             technicianTime: "0.0",
             technicianOvertime: "0.0",
             helperTime: "0.0",
@@ -451,7 +450,7 @@ export default function ServiceReportForm({
     setServiceNotesInputs((prev) => [
       ...prev,
       {
-        date: "",
+        date: new Date(),
         technicianTime: "0.0",
         technicianOvertime: "0.0",
         helperTime: "0.0",
@@ -482,6 +481,19 @@ export default function ServiceReportForm({
       )
     );
   };
+
+  const handleServiceNoteDateChange = (
+    index: number,
+    date: Date | undefined
+  ) => {
+    if (date) {
+      setServiceNotesInputs((prev) =>
+        prev.map((note, i) =>
+          i === index ? { ...note, date: new Date(date) } : note
+        )
+      );
+    }
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -893,9 +905,7 @@ export default function ServiceReportForm({
                       }
                     >
                       <span className="flex-1 text-left">
-                        {note.date
-                          ? format(parseISO(note.date), "PPP")
-                          : "Pick a date"}
+                        {note.date.toDateString()}
                       </span>
                       <CalendarIcon className="ml-2 w-4 h-4 text-muted-foreground" />
                     </Button>
@@ -903,13 +913,9 @@ export default function ServiceReportForm({
                   <PopoverContent className="w-auto p-0">
                     <Calendar
                       mode="single"
-                      selected={note.date ? parseISO(note.date) : undefined}
+                      selected={note.date}
                       onSelect={(date) => {
-                        handleServiceNoteChange(
-                          idx,
-                          "date",
-                          date ? date.toISOString().substring(0, 10) : ""
-                        );
+                        handleServiceNoteDateChange(idx, date);
                       }}
                     />
                   </PopoverContent>
