@@ -19,11 +19,13 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "./ui/sidebar";
 import NavMain from "./NavMain";
 import NavSecondary from "./NavSecondary";
 import NavUser from "./NavUser";
 import NavDocuments from "./NavDocuments";
+import Link from "next/link";
 const data = {
   navMain: [
     {
@@ -75,6 +77,9 @@ const data = {
 };
 
 export function AppSidebar() {
+  const { setOpenMobile, isMobile } = useSidebar();
+
+  console.log(isMobile, "isMobile in AppSidebar");
   return (
     <Sidebar>
       <SidebarHeader>
@@ -83,11 +88,14 @@ export function AppSidebar() {
             <SidebarMenuButton
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1.5"
+              onClick={() => {
+                if(isMobile) setOpenMobile(false);
+              }}
             >
-              <a href="/dashboard" className="flex items-center space-x-2">
+              <Link href="/dashboard" className="flex items-center space-x-2">
                 <ArrowUpCircleIcon className="h-5 w-5" />
                 <span className="text-base font-semibold">Sphere Portal</span>
-              </a>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

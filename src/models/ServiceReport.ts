@@ -127,3 +127,33 @@ export interface ServiceReportMessage {
   start_date: string;         // e.g. "2025-06-03"
   end_date: string;           // e.g. "2025-06-05"
 }
+
+export interface ServiceReportPDFMessage {
+  report_no: number;
+  date: string;
+  client_name: string;
+  service_address: string;
+  city_state_zip: string;
+  contact_name: string;
+  contact_phone: string;
+  contact_email: string;
+  signature?: string | null;
+  t_time: number;
+  t_ot: number;
+  h_time: number;
+  h_ot: number;
+  materials: string;
+  notes: Array<{
+    date: string;            // format "YYYY-MM-DD"
+    technician_time: number; // e.g. 3.5
+    technician_overtime: number;
+    helper_time: number;
+    helper_overtime: number;
+    remote_work: string;     // e.g. "Remote diagnostics only"
+    notes: string;           // free‐form text about that day’s work
+  }>;
+  technician_name: string;
+  technician_phone: string;
+  print_name?: string | null;
+  sign_date?: string | null;
+}

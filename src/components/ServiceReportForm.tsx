@@ -2,7 +2,7 @@
 
 import { useState, useEffect, FormEvent } from "react";
 import EmployeeSelect from "@/components/EmployeeSelect";
-import { Employee as EmployeeModel } from "@/models/Employee";
+import { Employee } from "@/models/Employee";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -60,6 +60,8 @@ import { firestore } from "@/lib/firebase";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { reserveDocid } from "@/services/reportService";
+import { ServiceReportPDFMessage } from "@/models/ServiceReport";
+import { getEmployeeByEmail } from "@/services/employeeService";
 
 interface ServiceReportFormProps {
   serviceReport?: ServiceReport;
@@ -89,10 +91,12 @@ export default function ServiceReportForm({
   const [isNewReport, setIsNewReport] = useState<boolean>(!serviceReport);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
-  const [authorTechnician, setAuthorTechnician] =
-    useState<EmployeeModel | null>(null);
-  const [assignedTechnician, setAssignedTechnician] =
-    useState<EmployeeModel | null>(null);
+  const [authorTechnician, setAuthorTechnician] = useState<Employee | null>(
+    null
+  );
+  const [assignedTechnician, setAssignedTechnician] = useState<Employee | null>(
+    null
+  );
 
   // The chosen client (from ClientSelect)
   const [client, setClient] = useState<ClientHit | null>(null);
@@ -157,7 +161,7 @@ export default function ServiceReportForm({
             createdAt: data["created-at"],
             updatedAt: data["updated-at"],
             ...data,
-          } as EmployeeModel);
+          } as Employee);
         }
       }
 
@@ -172,7 +176,7 @@ export default function ServiceReportForm({
             createdAt: data["created-at"],
             updatedAt: data["updated-at"],
             ...data,
-          } as EmployeeModel);
+          } as Employee);
         }
       }
       // Populate client from serviceReport.clientName if available
@@ -419,7 +423,7 @@ export default function ServiceReportForm({
           })),
         };
 
-        await setDoc(serviceReportRef, serviceReportData)
+        await setDoc(serviceReportRef, serviceReportData);
       }
 
       setIsNewReport(false);
@@ -493,14 +497,16 @@ export default function ServiceReportForm({
         )
       );
     }
-  }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    
+
     if (contactChanged) {
-      toast.error("Please save the contact information changes before submitting.");
+      toast.error(
+        "Please save the contact information changes before submitting."
+      );
       setSubmitting(false);
       return;
     }
@@ -570,6 +576,99 @@ export default function ServiceReportForm({
       contactEmail: "",
       contactPhone: "",
     });
+  };
+
+  // Generate PDF preview via API
+  const handleGeneratePDF = async () => {
+    if (!user) {
+      toast.error("You must be logged in to generate a PDF");
+      return;
+    }
+    if (!client || !building) {
+      toast.error("Please select a client and building");
+      return;
+    }
+    try {
+      const currentEmployee: Employee = await getEmployeeByEmail(user.email!);
+      // create base64 encoded bearer token
+      const token = btoa(
+        `${currentEmployee.clientId}:${currentEmployee.clientSecret}`
+      );
+      
+      if (!token) {
+        toast.error("Error loading employee data. Please try again later.");
+        return;
+      }
+
+      const authorizationHeader = `Bearer ${token}`;
+      console.log("Authorization Header:", authorizationHeader);
+
+      const formatDate = (d: Date) => d.toISOString().substring(0, 10);
+      const message: ServiceReportPDFMessage = {
+        report_no: serviceReport?.docId || 0,
+        date: formatDate(new Date()),
+        client_name: client.clientName,
+        service_address:
+          building.serviceAddress1 +
+          (building.serviceAddress2 ? ` ${building.serviceAddress2}` : ""),
+        city_state_zip: building.cityStateZip,
+        contact_name: building.contactName,
+        contact_phone: building.contactPhone,
+        contact_email: building.contactEmail,
+        signature: serviceReport?.printedName || null,
+        t_time: serviceNotesInputs.reduce(
+          (sum, n) => sum + parseFloat(n.technicianTime),
+          0
+        ),
+        t_ot: serviceNotesInputs.reduce(
+          (sum, n) => sum + parseFloat(n.technicianOvertime),
+          0
+        ),
+        h_time: serviceNotesInputs.reduce(
+          (sum, n) => sum + parseFloat(n.helperTime),
+          0
+        ),
+        h_ot: serviceNotesInputs.reduce(
+          (sum, n) => sum + parseFloat(n.helperOvertime),
+          0
+        ),
+        materials: materialNotes,
+        notes: serviceNotesInputs.map((n) => ({
+          date: formatDate(n.date as Date),
+          technician_time: parseFloat(n.technicianTime),
+          technician_overtime: parseFloat(n.technicianOvertime),
+          helper_time: parseFloat(n.helperTime),
+          helper_overtime: parseFloat(n.helperOvertime),
+          remote_work: n.remoteWork,
+          notes: n.notes,
+        })),
+        technician_name: authorTechnician?.name || "",
+        technician_phone: authorTechnician?.phone || "",
+        print_name: user?.displayName || null,
+        sign_date: serviceReport?.dateSigned
+          ? formatDate(serviceReport.dateSigned.toDate())
+          : null,
+      };
+      const res = await fetch("https://api.appliedbas.com/v1/pdf/sr", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: authorizationHeader,
+        },
+        body: JSON.stringify(message),
+      });
+
+      const data: { message: string; url: string; code: number } = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "PDF API error");
+      }
+
+      window.open(data.url, "_blank");
+      
+      toast.success("PDF generated and downloaded");
+    } catch {
+      toast.error("Error generating PDF");
+    }
   };
 
   return (
@@ -1035,8 +1134,16 @@ export default function ServiceReportForm({
           </Button>
         </div>
 
-        {/* === Save/Submit Buttons === */}
+        {/* === Preview/Save/Submit Buttons === */}
         <div className="mt-8 flex gap-4 mb-8">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={submitting}
+            onClick={handleGeneratePDF}
+          >
+            Preview
+          </Button>
           <Button
             type="button"
             disabled={submitting}

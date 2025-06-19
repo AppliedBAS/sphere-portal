@@ -32,7 +32,7 @@ interface Item {
 }
 
 export default function NavMain({ items }: { items: Item[] }) {
-  const { isMobile } = useSidebar();
+  const { isMobile, setOpenMobile } = useSidebar();
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
@@ -43,6 +43,9 @@ export default function NavMain({ items }: { items: Item[] }) {
                 <SidebarMenuButton
                   tooltip="Quick Create"
                   className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground space-x-2"
+                  onClick={() => {
+                    if (isMobile) setOpenMobile(false);
+                  }}
                 >
                   <PlusIcon />
                   <span>Quick Create</span>
@@ -57,19 +60,19 @@ export default function NavMain({ items }: { items: Item[] }) {
                 <DropdownMenuLabel>Quick Create</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                  <DropdownMenuItem asChild>
+                  <DropdownMenuItem asChild onClick={() => setOpenMobile(false)}>
                     <Link href="/dashboard/service-reports/create" className="flex items-center w-full">
                       <ClipboardCheck className="mr-4" />
                       <span>Service Reports</span>
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
+                  <DropdownMenuItem asChild onClick={() => setOpenMobile(false)}>
                     <Link href="/dashboard/project-reports/create" className="flex items-center w-full">
                       <FileBarChart2 className="mr-4" />
                       <span>Project Reports</span>
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
+                  <DropdownMenuItem asChild onClick={() => setOpenMobile(false)}>
                     <Link href="/dashboard/purchase-orders/create" className="flex items-center w-full">
                       <CreditCardIcon className="mr-4" />
                       <span>Purchase Orders</span>
@@ -83,7 +86,7 @@ export default function NavMain({ items }: { items: Item[] }) {
         <SidebarMenu>
           {items.map((item) => (
             <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton tooltip={item.title} asChild>
+              <SidebarMenuButton tooltip={item.title} asChild onClick={() => setOpenMobile(false)}>
                 <Link href={item.url}>
                   {item.icon && <item.icon className="mr-2" />}
                   <span>{item.title}</span>

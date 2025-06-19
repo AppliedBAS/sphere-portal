@@ -18,6 +18,7 @@ interface Item {
 
 export default function NavSecondary({ items }: { items: Item[] }) {
   const { theme, setTheme } = useTheme();
+  // const { isMobile, setOpenMobile } = useSidebar();
 
   const toggleTheme = () => {
     setTheme(theme === "light" ? "dark" : "light");
