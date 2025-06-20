@@ -177,7 +177,7 @@ export default function Dashboard() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle className="text-lg md:text-sm">Select Report Type</DialogTitle>
+              <DialogTitle>Select Report Type</DialogTitle>
               <DialogDescription>
                 Choose which kind of report you want to create.
               </DialogDescription>

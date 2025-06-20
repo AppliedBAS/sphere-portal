@@ -119,7 +119,7 @@ const ServiceReportViewPage = () => {
       </Breadcrumb>
 
       {/* Title */}
-      <h1 className="text-2xl font-bold mb-2">Service Report {report.docId}</h1>
+      <h1 className="text-3xl font-bold mb-2">Service Report {report.docId}</h1>
       <div className="mb-6">
         <Badge
           variant={report.draft ? "outline" : "default"}
@@ -136,7 +136,7 @@ const ServiceReportViewPage = () => {
       {/* Main grid */}
       <div className="grid grid-cols-1 gap-6">
         {/* Left: Main Info */}
-        <Card className="p-4 space-y-4 relative">
+        <Card className="p-4 space-y-4 relative text-lg md:text-base">
           {/* Edit icon for main info */}
           {report.draft && (
             <div className="absolute top-4 right-4 z-10">
@@ -196,7 +196,7 @@ const ServiceReportViewPage = () => {
         </Card>
 
         {/* Right: Service Notes */}
-        <Card className="p-4 relative">
+        <Card className="p-4 relative text-lg md:text-base">
           <h2 className="font-semibold mb-2">Service Notes</h2>
           {/* Edit icon for service notes */}
           {report.draft && (

@@ -57,10 +57,13 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { reserveDocid } from "@/services/reportService";
-import { ServiceReportPDFMessage } from "@/models/ServiceReport";
+import {
+  ServiceReportPDFMessage,
+  ServiceReportMessage,
+} from "@/models/ServiceReport";
 import { getEmployeeByEmail } from "@/services/employeeService";
 
 interface ServiceReportFormProps {
@@ -98,6 +101,9 @@ export default function ServiceReportForm({
     null
   );
 
+  const [docId, setDocId] = useState<number | null>(
+    serviceReport?.docId || null
+  );
   // The chosen client (from ClientSelect)
   const [client, setClient] = useState<ClientHit | null>(null);
 
@@ -295,7 +301,9 @@ export default function ServiceReportForm({
         contactEmail: building.contactEmail,
         contactPhone: building.contactPhone,
       });
-      toast.success("Contact information saved!");
+      toast.success(
+        <span className="text-lg md:text-sm">Contact information saved!</span>
+      );
     } catch {
       toast.error("Failed to save contact information");
     }
@@ -383,6 +391,7 @@ export default function ServiceReportForm({
           ),
           newServiceReport
         );
+        setDocId(docId);
       } else {
         // use existing serviceReport.id
         const serviceReportRef = doc(
@@ -395,7 +404,7 @@ export default function ServiceReportForm({
           id: serviceReport!.id,
           docId: serviceReport!.docId,
           createdAt: serviceReport!.createdAt,
-          dateSigned: serviceReport!.dateSigned,
+          dateSigned: null,
           draft: true,
           printedName: serviceReport!.printedName,
           authorTechnicianRef: serviceReport!.authorTechnicianRef,
@@ -429,10 +438,14 @@ export default function ServiceReportForm({
       setIsNewReport(false);
       setSubmitting(false);
 
-      toast.success("Draft saved successfully!");
+      toast.success(
+        <span className="text-lg md:text-sm">Draft saved successfully!</span>
+      );
     } catch (error) {
       console.error("Error saving draft:", error);
-      toast.error("Failed to save draft");
+      toast.error(
+        <span className="text-lg md:text-sm">Failed to save draft. Please try again.</span>
+      );
     }
   };
 
@@ -474,6 +487,7 @@ export default function ServiceReportForm({
     field: keyof ServiceNoteInput,
     value: string
   ) => {
+    console.log(`Updating service note ${index} field ${field} to ${value}`);
     setServiceNotesInputs((prev) =>
       prev.map((note, i) =>
         i === index
@@ -510,7 +524,169 @@ export default function ServiceReportForm({
       setSubmitting(false);
       return;
     }
-    setSubmitting(false);
+
+    if (!user) {
+      toast.error("You must be logged in to submit a service report.");
+      setSubmitting(false);
+      return;
+    }
+
+    if (!authorTechnician) {
+      toast.error("Error loading author technician. Try again later.");
+      setSubmitting(false);
+      return;
+    }
+
+    if (!client || !building) {
+      toast.error("Client and building must be selected before sending.");
+      setSubmitting(false);
+      return;
+    }
+
+    // Reserve or use existing docId
+    let currentDocId = docId;
+    if (isNewReport) {
+      currentDocId = await reserveDocid();
+      setDocId(currentDocId);
+      // Create new ServiceReport in Firestore
+      const newReport: ServiceReport = {
+        id: crypto.randomUUID(),
+        docId: currentDocId!,
+        authorTechnicianRef: doc(firestore, "employees", authorTechnician!.id),
+        assignedTechnicianRef: assignedTechnician
+          ? doc(firestore, "employees", assignedTechnician.id)
+          : null,
+        clientName: client.clientName,
+        serviceAddress1: building.serviceAddress1,
+        serviceAddress2: building.serviceAddress2,
+        cityStateZip: building.cityStateZip,
+        contactName: building.contactName,
+        contactEmail: building.contactEmail,
+        contactPhone: building.contactPhone,
+        materialNotes,
+        serviceNotes: serviceNotesInputs.map((n) => ({
+          date: Timestamp.fromDate(n.date as Date),
+          technicianTime: n.technicianTime,
+          technicianOvertime: n.technicianOvertime,
+          helperTime: n.helperTime,
+          helperOvertime: n.helperOvertime,
+          remoteWork: n.remoteWork,
+          serviceNotes: n.notes,
+        })),
+        createdAt: Timestamp.now(),
+        dateSigned: null,
+        draft: false,
+        printedName: user?.displayName || "",
+      };
+      await addDoc(
+        collection(firestore, "reports").withConverter(serviceReportConverter),
+        newReport
+      );
+      setIsNewReport(false);
+    } else {
+      // Update existing report if needed
+      const reportRef = doc(
+        firestore,
+        "reports",
+        serviceReport!.id
+      ).withConverter(serviceReportConverter);
+      await setDoc(reportRef, {
+        ...serviceReport!,
+        serviceNotes: serviceNotesInputs.map((n) => ({
+          date: Timestamp.fromDate(n.date as Date),
+          technicianTime: n.technicianTime,
+          technicianOvertime: n.technicianOvertime,
+          helperTime: n.helperTime,
+          helperOvertime: n.helperOvertime,
+          remoteWork: n.remoteWork,
+          serviceNotes: n.notes,
+        })),
+        draft: false,
+      });
+    }
+
+    const currentEmployee: Employee = await getEmployeeByEmail(user.email!);
+    // create base64 encoded bearer token
+    const token = btoa(
+      `${currentEmployee.clientId}:${currentEmployee.clientSecret}`
+    );
+
+    if (!token) {
+      toast.error("Error loading employee data. Please try again later.");
+      return;
+    }
+
+    const authorizationHeader = `Bearer ${token}`;
+    // Now build and send email via API
+    const formatDate = (d: Date) => d.toISOString().substring(0, 10);
+    const firstDate = serviceNotesInputs[0].date as Date;
+    const lastDate = serviceNotesInputs[serviceNotesInputs.length - 1]
+      .date as Date;
+    const message: ServiceReportMessage = {
+      report_no: currentDocId!,
+      date: formatDate(new Date()),
+      client_name: client.clientName,
+      service_address:
+        building.serviceAddress1 +
+        (building.serviceAddress2 ? ` ${building.serviceAddress2}` : ""),
+      city_state_zip: building.cityStateZip,
+      contact_name: building.contactName,
+      contact_phone: building.contactPhone,
+      contact_email: building.contactEmail,
+      signature: serviceReport?.printedName || null,
+      t_time: serviceNotesInputs.reduce(
+        (sum, n) => sum + parseFloat(n.technicianTime),
+        0
+      ),
+      t_ot: serviceNotesInputs.reduce(
+        (sum, n) => sum + parseFloat(n.technicianOvertime),
+        0
+      ),
+      h_time: serviceNotesInputs.reduce(
+        (sum, n) => sum + parseFloat(n.helperTime),
+        0
+      ),
+      h_ot: serviceNotesInputs.reduce(
+        (sum, n) => sum + parseFloat(n.helperOvertime),
+        0
+      ),
+      materials: materialNotes,
+      notes: serviceNotesInputs.map((n) => ({
+        date: formatDate(n.date as Date),
+        t_time: parseFloat(n.technicianTime),
+        t_ot: parseFloat(n.technicianOvertime),
+        h_time: parseFloat(n.helperTime),
+        h_ot: parseFloat(n.helperOvertime),
+        remote: n.remoteWork,
+        note: n.notes,
+      })),
+      technician_name: authorTechnician.name,
+      technician_phone: authorTechnician.phone,
+      technician_email: authorTechnician.email,
+      print_name: null,
+      sign_date: null,
+      to_emails: ["eretana238@gmail.com"],
+      // to_emails: [building.contactEmail],
+      start_date: formatDate(firstDate),
+      end_date: formatDate(lastDate),
+    };
+    try {
+      const res = await fetch("https://api.appliedbas.com/v2/mail/sr", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: authorizationHeader,
+        },
+        body: JSON.stringify(message),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Error sending report");
+      toast.success(data.message);
+    } catch {
+      toast.error("Failed to send service report");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleNewBuildingChange = (field: string, value: string) => {
@@ -588,24 +764,28 @@ export default function ServiceReportForm({
       toast.error("Please select a client and building");
       return;
     }
+    if (!authorTechnician) {
+      toast.error("Error loading author technician. Try again later.");
+      return;
+    }
+    setSubmitting(true);
     try {
       const currentEmployee: Employee = await getEmployeeByEmail(user.email!);
       // create base64 encoded bearer token
       const token = btoa(
         `${currentEmployee.clientId}:${currentEmployee.clientSecret}`
       );
-      
+
       if (!token) {
         toast.error("Error loading employee data. Please try again later.");
         return;
       }
 
       const authorizationHeader = `Bearer ${token}`;
-      console.log("Authorization Header:", authorizationHeader);
 
       const formatDate = (d: Date) => d.toISOString().substring(0, 10);
       const message: ServiceReportPDFMessage = {
-        report_no: serviceReport?.docId || 0,
+        report_no: docId!,
         date: formatDate(new Date()),
         client_name: client.clientName,
         service_address:
@@ -615,7 +795,7 @@ export default function ServiceReportForm({
         contact_name: building.contactName,
         contact_phone: building.contactPhone,
         contact_email: building.contactEmail,
-        signature: serviceReport?.printedName || null,
+        signature: null,
         t_time: serviceNotesInputs.reduce(
           (sum, n) => sum + parseFloat(n.technicianTime),
           0
@@ -635,20 +815,19 @@ export default function ServiceReportForm({
         materials: materialNotes,
         notes: serviceNotesInputs.map((n) => ({
           date: formatDate(n.date as Date),
-          technician_time: parseFloat(n.technicianTime),
-          technician_overtime: parseFloat(n.technicianOvertime),
-          helper_time: parseFloat(n.helperTime),
-          helper_overtime: parseFloat(n.helperOvertime),
-          remote_work: n.remoteWork,
-          notes: n.notes,
+          t_time: parseFloat(n.technicianTime),
+          t_ot: parseFloat(n.technicianOvertime),
+          h_time: parseFloat(n.helperTime),
+          h_ot: parseFloat(n.helperOvertime),
+          remote: n.remoteWork,
+          note: n.notes,
         })),
-        technician_name: authorTechnician?.name || "",
-        technician_phone: authorTechnician?.phone || "",
-        print_name: user?.displayName || null,
-        sign_date: serviceReport?.dateSigned
-          ? formatDate(serviceReport.dateSigned.toDate())
-          : null,
+        technician_name: authorTechnician.name,
+        technician_phone: authorTechnician.phone,
+        print_name: null,
+        sign_date: null,
       };
+
       const res = await fetch("https://api.appliedbas.com/v1/pdf/sr", {
         method: "POST",
         headers: {
@@ -658,16 +837,18 @@ export default function ServiceReportForm({
         body: JSON.stringify(message),
       });
 
-      const data: { message: string; url: string; code: number } = await res.json();
+      const data: { message: string; url: string; code: number } =
+        await res.json();
       if (!res.ok) {
         throw new Error(data.message || "PDF API error");
       }
-
       window.open(data.url, "_blank");
-      
+
       toast.success("PDF generated and downloaded");
     } catch {
       toast.error("Error generating PDF");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -676,7 +857,7 @@ export default function ServiceReportForm({
       <div className="mt-4 flex flex-col gap-6">
         {/* === Assigned Technician === */}
         <div className="flex flex-col space-y-2">
-          <Label htmlFor="authorTechnician">Assigned Technician</Label>
+          <Label htmlFor="authorTechnician" className="text-lg md:text-sm">Assigned Technician</Label>
           <EmployeeSelect
             employees={technicians}
             loading={loadingEmployees}
@@ -686,7 +867,7 @@ export default function ServiceReportForm({
             setSelectedEmployee={setAssignedTechnician}
             placeholder="Select Technician..."
           />
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-base md:text-sm text-muted-foreground mt-1">
             Leave blank if you are the assigned technician.
           </p>
         </div>
@@ -880,7 +1061,7 @@ export default function ServiceReportForm({
         {/* === Contact & Address Fields (always editable, visually separated) === */}
         {building && (
           <div className="flex flex-col gap-4 p-4 mt-4 mb-2 border rounded-lg bg-muted/30">
-            <span className="font-semibold text-sm mb-2">
+            <span className="font-semibold text-lg md:text-sm mb-2">
               Contact Information
             </span>
             <div className="flex flex-col space-y-2">
@@ -973,11 +1154,11 @@ export default function ServiceReportForm({
 
         {/* === Service Notes === */}
         <div className="mt-6">
-          <span className="text-sm font-medium">Service Notes</span>
+          <span className="text-lg md:text-sm">Service Notes</span>
           {serviceNotesInputs.map((note, idx) => (
             <div key={idx} className="mt-4 border rounded-lg p-4 space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-semibold">Entry #{idx + 1}</span>
+                <span className="text-lg md:text-sm font-semibold">Entry #{idx + 1}</span>
                 {serviceNotesInputs.length > 1 && (
                   <Button
                     type="button"
@@ -1101,8 +1282,8 @@ export default function ServiceReportForm({
                     )
                   }
                 />
-                <span className="ml-2 text-sm">
-                  {note.remoteWork === "yes" ? "Yes" : "No"}
+                <span className="ml-2 text-lg md:text-sm">
+                  {note.remoteWork === "Y" ? "Yes" : "No"}
                 </span>
               </div>
 
@@ -1156,12 +1337,14 @@ export default function ServiceReportForm({
             type="submit"
             disabled={submitting || !client}
             variant="default"
-            onClick={() => {
-              toast.info("Submitted service report (not implemented)");
-            }}
           >
             Submit
           </Button>
+          {submitting && (
+            <div className="my-auto">
+              <Loader2 className="animate-spin text-muted-foreground" />
+            </div>
+          )}
         </div>
       </div>
     </form>

@@ -111,12 +111,12 @@ export interface ServiceReportMessage {
   materials: string;         // e.g. "Copper tubing, valves"
   notes: Array<{
     date: string;            // format "YYYY-MM-DD"
-    technician_time: number; // e.g. 3.5
-    technician_overtime: number;
-    helper_time: number;
-    helper_overtime: number;
-    remote_work: string;     // e.g. "Remote diagnostics only"
-    notes: string;           // free‐form text about that day’s work
+    t_time: number; // e.g. 3.5
+    t_ot: number;
+    h_time: number;
+    h_ot: number;
+    remote: string;     // e.g. "Remote diagnostics only"
+    note: string;           // free‐form text about that day’s work
   }>;
   technician_name: string;
   technician_phone: string;
@@ -145,12 +145,12 @@ export interface ServiceReportPDFMessage {
   materials: string;
   notes: Array<{
     date: string;            // format "YYYY-MM-DD"
-    technician_time: number; // e.g. 3.5
-    technician_overtime: number;
-    helper_time: number;
-    helper_overtime: number;
-    remote_work: string;     // e.g. "Remote diagnostics only"
-    notes: string;           // free‐form text about that day’s work
+    t_time: number; // e.g. 3.5
+    t_ot: number;
+    h_time: number;
+    h_ot: number;
+    remote: string;     // e.g. "Remote diagnostics only"
+    note: string;           // free‐form text about that day’s work
   }>;
   technician_name: string;
   technician_phone: string;
