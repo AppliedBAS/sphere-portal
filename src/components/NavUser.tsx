@@ -119,11 +119,11 @@ export default function NavUser() {
             <DropdownMenuGroup>
               <DropdownMenuItem>
                 <UserCircleIcon />
-                Account Placeholder
+                Account
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <BellIcon />
-                Notifications Placeholder
+                Notifications
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />

@@ -79,7 +79,6 @@ const data = {
 export function AppSidebar() {
   const { setOpenMobile, isMobile } = useSidebar();
 
-  console.log(isMobile, "isMobile in AppSidebar");
   return (
     <Sidebar>
       <SidebarHeader>

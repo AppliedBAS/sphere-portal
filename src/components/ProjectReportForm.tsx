@@ -4,7 +4,7 @@
 import { useState, useEffect, FormEvent } from "react";
 import EmployeeSelect from "./EmployeeSelect";
 import { Employee as EmployeeModel } from "@/models/Employee";
-import ProjectSelect from "./ProjectSelect";
+// import ProjectSelect from "./ProjectSelect";
 import { Button } from "./ui/button";
 import { useEmployees } from "@/hooks/useEmployees";
 import {
@@ -63,6 +63,7 @@ export default function ProjectReportForm({
         location: firestoreProject.location,
       };
       setProject(projectHit);
+      console.log("Loaded project:", project);
 
       if (projectReport.leadTechnicianRef) {
         const employeeSnap = await getDoc(projectReport.leadTechnicianRef);
@@ -185,10 +186,10 @@ export default function ProjectReportForm({
         <Label htmlFor="projectId" className="text-sm">
           Project
         </Label>
-        <ProjectSelect
+        {/* <ProjectSelect
           selectedProject={project}
           setSelectedProject={setProject}
-        />
+        /> */}
 
         <Label htmlFor="leadTechnician" className="text-sm">
           Lead Technician

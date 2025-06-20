@@ -42,7 +42,7 @@ export default function NavMain({ items }: { items: Item[] }) {
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   tooltip="Quick Create"
-                  className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground space-x-2"
+                  className="min-w-10 bg-primary text-lg text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground space-x-2"
                   onClick={() => {
                     if (isMobile) setOpenMobile(false);
                   }}
@@ -62,7 +62,7 @@ export default function NavMain({ items }: { items: Item[] }) {
                 <DropdownMenuGroup>
                   <DropdownMenuItem asChild onClick={() => setOpenMobile(false)}>
                     <Link href="/dashboard/service-reports/create" className="flex items-center w-full">
-                      <ClipboardCheck className="mr-4" />
+                      <ClipboardCheck className="mr-4"  />
                       <span>Service Reports</span>
                     </Link>
                   </DropdownMenuItem>
@@ -86,7 +86,7 @@ export default function NavMain({ items }: { items: Item[] }) {
         <SidebarMenu>
           {items.map((item) => (
             <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton tooltip={item.title} asChild onClick={() => setOpenMobile(false)}>
+              <SidebarMenuButton className="text-lg md:text-sm" tooltip={item.title} asChild onClick={() => setOpenMobile(false)}>
                 <Link href={item.url}>
                   {item.icon && <item.icon className="mr-2" />}
                   <span>{item.title}</span>

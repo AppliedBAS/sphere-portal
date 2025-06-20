@@ -149,7 +149,19 @@ export default function ServiceReportForm({
       },
     ]
   );
+  useEffect(() => {
+    async function initForm() {
+      console.log("Initializing service report form...");
+      if (!serviceReport && user) {
+        setDocId(0);
 
+        const currentEmployee: Employee = await getEmployeeByEmail(user.email!);
+        setAuthorTechnician(currentEmployee);
+      }
+    }
+
+    initForm();
+  }, []);
   // If editing an existing report, load its author technician (and any pre‐saved client fields)
   useEffect(() => {
     async function initForm() {
@@ -212,7 +224,6 @@ export default function ServiceReportForm({
               : [],
           };
           setClient(clientHit);
-          console.log("Client loaded:", clientHit);
           // Set building if possible
           const foundBuilding = clientHit.buildings.find(
             (bld) => bld.serviceAddress1 === serviceReport.serviceAddress1
@@ -305,7 +316,9 @@ export default function ServiceReportForm({
         <span className="text-lg md:text-sm">Contact information saved!</span>
       );
     } catch {
-      toast.error("Failed to save contact information");
+      toast.error(
+        <span className="text-lg md:text-sm">Failed to save contact info.</span>
+      );
     }
   };
 
@@ -317,26 +330,40 @@ export default function ServiceReportForm({
     }
 
     if (!authorTechnician) {
-      toast.error("Error loading author technician. Try again later.");
+      toast.error(
+        <span className="text-lg md:text-sm">
+          Error loading author technician. Please try again later.
+        </span>
+      );
       setSubmitting(false);
       return;
     }
 
     if (!client) {
-      toast.error("Please select a client before saving the draft.");
+      toast.error(
+        <span className="text-lg md:text-sm">
+          Please select a client before saving the draft.
+        </span>
+      );
       setSubmitting(false);
       return;
     }
 
     if (!building) {
-      toast.error("Please select a building before saving the draft.");
+      toast.error(
+        <span className="text-lg md:text-sm">
+          Please select a building before saving the draft.
+        </span>
+      );
       setSubmitting(false);
       return;
     }
 
     if (serviceNotesInputs.length === 0) {
       toast.error(
-        "Please add at least one service note before saving the draft."
+        <span className="text-lg md:text-sm">
+          Please add at least one service note before saving the draft.
+        </span>
       );
       setSubmitting(false);
       return;
@@ -385,13 +412,15 @@ export default function ServiceReportForm({
         };
 
         // create new document reference
-        await addDoc(
+        const docRef = await addDoc(
           collection(firestore, "reports").withConverter(
             serviceReportConverter
           ),
           newServiceReport
         );
         setDocId(docId);
+
+        window.location.href = `/dashboard/service-reports/${docRef.id}/edit`;
       } else {
         // use existing serviceReport.id
         const serviceReportRef = doc(
@@ -444,7 +473,9 @@ export default function ServiceReportForm({
     } catch (error) {
       console.error("Error saving draft:", error);
       toast.error(
-        <span className="text-lg md:text-sm">Failed to save draft. Please try again.</span>
+        <span className="text-lg md:text-sm">
+          Failed to save draft. Please try again.
+        </span>
       );
     }
   };
@@ -487,7 +518,6 @@ export default function ServiceReportForm({
     field: keyof ServiceNoteInput,
     value: string
   ) => {
-    console.log(`Updating service note ${index} field ${field} to ${value}`);
     setServiceNotesInputs((prev) =>
       prev.map((note, i) =>
         i === index
@@ -785,7 +815,7 @@ export default function ServiceReportForm({
 
       const formatDate = (d: Date) => d.toISOString().substring(0, 10);
       const message: ServiceReportPDFMessage = {
-        report_no: docId!,
+        report_no: docId || 0,
         date: formatDate(new Date()),
         client_name: client.clientName,
         service_address:
@@ -857,7 +887,9 @@ export default function ServiceReportForm({
       <div className="mt-4 flex flex-col gap-6">
         {/* === Assigned Technician === */}
         <div className="flex flex-col space-y-2">
-          <Label htmlFor="authorTechnician" className="text-lg md:text-sm">Assigned Technician</Label>
+          <Label htmlFor="authorTechnician" className="text-lg md:text-sm">
+            Assigned Technician
+          </Label>
           <EmployeeSelect
             employees={technicians}
             loading={loadingEmployees}
@@ -1158,7 +1190,9 @@ export default function ServiceReportForm({
           {serviceNotesInputs.map((note, idx) => (
             <div key={idx} className="mt-4 border rounded-lg p-4 space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-lg md:text-sm font-semibold">Entry #{idx + 1}</span>
+                <span className="text-lg md:text-sm font-semibold">
+                  Entry #{idx + 1}
+                </span>
                 {serviceNotesInputs.length > 1 && (
                   <Button
                     type="button"
