@@ -36,7 +36,7 @@ export default function TimeSelect({
       </SelectTrigger>
       <SelectContent>
         {times.map((time) => (
-          <SelectItem key={time} value={time}>
+          <SelectItem key={time} value={time} >
             {time}
           </SelectItem>
         ))}

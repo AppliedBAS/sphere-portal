@@ -51,14 +51,14 @@ export default function EmployeeSelect({
   }, [employees, query]);
 
   return (
-    <div className="max-w-[400px]">
+    <div className="w-full md:max-w-96 relative">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="w-[400px] justify-between"
+            className="w-full justify-between md:text-sm"
             onClick={() => {
               // Refetch employees any time the popover opens if the list is empty
               if (!open && employees.length === 0) {
@@ -71,7 +71,7 @@ export default function EmployeeSelect({
           </Button>
         </PopoverTrigger>
 
-        <PopoverContent className="w-[400px] max-h-80 overflow-y-auto">
+        <PopoverContent className="w-96 max-h-56 overflow-y-auto" align="start">
           <Command>
             <CommandInput
               placeholder="Search employees..."

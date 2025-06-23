@@ -1,5 +1,5 @@
 import { LucideIcon } from "lucide-react";
-import { SidebarGroup, SidebarGroupLabel, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "./ui/sidebar";
+import { SidebarGroup, SidebarGroupLabel, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "./ui/sidebar";
 import Link from "next/link";
 
 interface Item {
@@ -9,6 +9,7 @@ interface Item {
 }
 
 export default function NavDocuments({ items }: { items: Item[] }) {
+  const { isMobile, setOpenMobile } = useSidebar();
   return (
     <SidebarGroup>
           <SidebarGroupLabel>Documents</SidebarGroupLabel>
@@ -16,10 +17,12 @@ export default function NavDocuments({ items }: { items: Item[] }) {
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton asChild onClick={() => {
+                    if (isMobile) setOpenMobile(false);
+                  }}>
                     <Link href={item.url} className="flex items-center space-x-2">
                       {item.icon && <item.icon />}
-                      <span>{item.title}</span>
+                      <span className="text-lg md:text-sm">{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

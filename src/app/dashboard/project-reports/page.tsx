@@ -283,7 +283,7 @@ export default function ProjectReports() {
                     variant="outline"
                     className="text-green-800 border-green-300 bg-green-50"
                   >
-                    Published
+                    Submitted
                   </Badge>
                 )}
               </TableCell>
