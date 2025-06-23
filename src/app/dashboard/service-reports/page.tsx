@@ -175,6 +175,12 @@ export default function ServiceReports() {
     return withStatusOrder.slice(start, start + pageSize);
   }, [withStatusOrder, pageIndex]);
 
+  // Sort for mobile: docId greatest to lowest
+  const mobileReports = useMemo(
+    () => [...reports].sort((a, b) => b.docId - a.docId),
+    [reports]
+  );
+
   // Helper to format Firestore Timestamp
   const formatDate = (ts: Timestamp) => ts.toDate().toLocaleString();
 
@@ -212,7 +218,7 @@ export default function ServiceReports() {
 
       {isMobile ? (
         <div className="grid grid-cols-1 gap-4">
-          {reports.map((report) => (
+          {mobileReports.map((report) => (
             <DashboardCard
               key={report.id}
               icon={<ClipboardList />}
