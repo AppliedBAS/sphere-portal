@@ -16,12 +16,15 @@ import {
   User,
 } from "firebase/auth";
 import { useRouter } from "next/navigation";
+import { Employee } from "@/models/Employee";
+import { getEmployeeByEmail } from "@/services/employeeService";
 
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
   login: () => Promise<void>;
   logout: () => Promise<void>;
+  firebaseUser: Employee | null;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -29,6 +32,7 @@ const AuthContext = createContext<AuthContextValue>({
   loading: true,
   login: async () => {},
   logout: async () => {},
+  firebaseUser: null,
 });
 
 interface AuthProviderProps {
@@ -37,16 +41,27 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
-        setUser(fbUser);
-        setLoading(false);
-      if (!fbUser) {
+      setUser(fbUser);
+
+      if (fbUser?.email) {
+        getEmployeeByEmail(fbUser.email)
+          .then(setFirebaseUser)
+          .catch((error) => {
+            console.error("Error fetching employee data:", error);
+            setFirebaseUser(null);
+          });
+      } else {
+        setFirebaseUser(null);
         router.replace("/login");
       }
+
+      setLoading(false);
     });
     return () => unsubscribe();
   }, [router]);
@@ -74,7 +89,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, firebaseUser }}>
       {children}
     </AuthContext.Provider>
   );

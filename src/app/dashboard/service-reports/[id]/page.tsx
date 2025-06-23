@@ -16,11 +16,13 @@ import {
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Pencil } from "lucide-react";
+// import { useAuth } from "@/contexts/AuthContext";
 
 const ServiceReportViewPage = () => {
   const { id } = useParams();
   const [report, setReport] = useState<ServiceReport | null>(null);
   const [loading, setLoading] = useState(true);
+  // const { firebaseUser } = useAuth();
 
   useEffect(() => {
     async function fetchReport() {
@@ -84,13 +86,17 @@ const ServiceReportViewPage = () => {
           printedName: data["printed-name"],
           ...snap.data(),
         } as ServiceReport);
-      }
-      
+      }      
 
       setLoading(false);
     }
     fetchReport();
   }, [id]);
+
+  // const canEdit = (report: ServiceReport) => (
+  //   (firebaseUser?.policy.includes("SERVICE_REPORT_EDIT_SELF") && report?.authorTechnicianRef.id === firebaseUser.id)
+  //   || firebaseUser?.policy.includes("SERVICE_REPORT_ACCESS_FULL") || report?.assignedTechnicianRef?.id === firebaseUser?.id
+  // );
 
   if (loading) return <div>Loading…</div>;
   if (!report) return <div>Service Report not found.</div>;
@@ -140,15 +146,17 @@ const ServiceReportViewPage = () => {
           {/* Edit icon for main info */}
           {report.draft && (
             <div className="absolute top-4 right-4 z-10">
-              <Link href={`/dashboard/service-reports/${id}/edit`} className="block">
-                <button
-                  type="button"
-                  className="p-2 rounded hover:bg-muted transition"
-                  aria-label="Edit main info"
-                >
-                  <Pencil className="w-5 h-5" />
-                </button>
-              </Link>
+              {report.draft  && (
+                <Link href={`/dashboard/service-reports/${id}/edit`} className="block">
+                  <button
+                    type="button"
+                    className="p-2 rounded hover:bg-muted transition"
+                    aria-label="Edit main info"
+                  >
+                    <Pencil className="w-5 h-5" />
+                  </button>
+                </Link>
+              )}
             </div>
           )}
           <div>
@@ -201,15 +209,17 @@ const ServiceReportViewPage = () => {
           {/* Edit icon for service notes */}
           {report.draft && (
             <div className="absolute top-4 right-4 z-10">
-              <Link href={`/dashboard/service-reports/${id}/edit`} className="block">
-                <button
-                  type="button"
-                  className="p-2 rounded hover:bg-muted transition"
-                  aria-label="Edit service notes"
-                >
-                  <Pencil className="w-5 h-5" />
-                </button>
-              </Link>
+              {report.draft && (
+                <Link href={`/dashboard/service-reports/${id}/edit`} className="block">
+                  <button
+                    type="button"
+                    className="p-2 rounded hover:bg-muted transition"
+                    aria-label="Edit service notes"
+                  >
+                    <Pencil className="w-5 h-5" />
+                  </button>
+                </Link>
+              )}
             </div>
           )}
           <div className="space-y-6">

@@ -7,14 +7,10 @@ import { Employee as EmployeeModel } from "@/models/Employee";
 // import ProjectSelect from "./ProjectSelect";
 import { Button } from "./ui/button";
 import { useEmployees } from "@/hooks/useEmployees";
-import {
-  // getEmployeeByEmail,
-  getProjectById,
-  // sendProjectReportEmail,
-} from "@/lib/services";
+
 import { ProjectReport } from "@/models/ProjectReport";
 import { toast } from "sonner";
-import { Project, ProjectHit } from "@/models/Project";
+// import { Project, ProjectHit } from "@/models/Project";
 import { getDoc } from "firebase/firestore";
 import { Textarea } from "./ui/textarea";
 import { Label } from "./ui/label";
@@ -36,7 +32,7 @@ export default function ProjectReportForm({
 
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [leadEmployee, setLeadEmployee] = useState<EmployeeModel | null>(null);
-  const [project, setProject] = useState<ProjectHit | null>(null);
+  // const [project, setProject] = useState<ProjectHit | null>(null);
   const [assignedTechnicians, setAssignedTechnicians] = useState<
     EmployeeModel[]
   >([]);
@@ -52,18 +48,17 @@ export default function ProjectReportForm({
     async function initForm() {
       if (!projectReport) return;
 
-      const firestoreProject: Project = await getProjectById(
-        projectReport.projectDocId
-      );
-      const projectHit: ProjectHit = {
-        objectID: firestoreProject.id,
-        docId: firestoreProject.docId,
-        client: firestoreProject.client,
-        description: firestoreProject.description,
-        location: firestoreProject.location,
-      };
-      setProject(projectHit);
-      console.log("Loaded project:", project);
+      // const firestoreProject: Project = await getProjectById(
+      //   projectReport.projectDocId
+      // );
+      // const projectHit: ProjectHit = {
+      //   objectID: firestoreProject.id,
+      //   docId: firestoreProject.docId,
+      //   client: firestoreProject.client,
+      //   description: firestoreProject.description,
+      //   location: firestoreProject.location,
+      // };
+      // setProject(projectHit);
 
       if (projectReport.leadTechnicianRef) {
         const employeeSnap = await getDoc(projectReport.leadTechnicianRef);

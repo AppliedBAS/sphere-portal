@@ -19,6 +19,7 @@ export interface ServiceReport {
     serviceAddress1: string;
     serviceAddress2: string | null;
     serviceNotes: ServiceNote[];
+    warranty?: boolean; // Optional field for warranty status
 }
 
 export const serviceReportConverter: FirestoreDataConverter<ServiceReport> = {
@@ -47,7 +48,8 @@ export const serviceReportConverter: FirestoreDataConverter<ServiceReport> = {
             "service-notes": note.serviceNotes,
             "technician-overtime": note.technicianOvertime,
             "technician-time": note.technicianTime,
-          }))
+          })),
+      warranty: report.warranty,
     };
   },
   fromFirestore(
@@ -80,6 +82,7 @@ export const serviceReportConverter: FirestoreDataConverter<ServiceReport> = {
         technicianOvertime: note["technician-overtime"],
         technicianTime: note["technician-time"],
       })),
+      warranty: data.warranty ?? false,
     };
   },
 };
