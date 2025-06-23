@@ -10,10 +10,12 @@ import React, {
 import { auth } from "@/lib/firebase";
 import {
   onAuthStateChanged,
-  signInWithPopup,
   OAuthProvider,
   signOut,
   User,
+  signInWithPopup,
+  setPersistence,
+  browserSessionPersistence,
 } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { Employee } from "@/models/Employee";
@@ -46,7 +48,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const router = useRouter();
 
   useEffect(() => {
+    (async () => {
+      try {
+        await setPersistence(auth, browserSessionPersistence);
+      } catch (error) {
+        console.error("Error setting auth persistence:", error);
+      }
+    })()
+    
     const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
+      console.log("Auth state changed:", fbUser);
       setUser(fbUser);
 
       if (fbUser?.email) {
@@ -55,6 +66,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           .catch((error) => {
             console.error("Error fetching employee data:", error);
             setFirebaseUser(null);
+          }).finally(() => {
+
+            router.replace("/dashboard");
           });
       } else {
         setFirebaseUser(null);
@@ -64,6 +78,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setLoading(false);
     });
     return () => unsubscribe();
+    
   }, [router]);
 
   const login = async () => {
@@ -74,9 +89,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       login_hint: "user@appliedbas.com",
       tenant: 'ad969dc0-5f48-4d4a-89bc-c5b5532c5d6b'
     });
-
     try {
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      console.log("Login result:", result);
     } catch (err) {
       console.error("Login error", err);
       throw err;
