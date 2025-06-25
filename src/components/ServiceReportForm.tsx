@@ -223,6 +223,14 @@ export default function ServiceReportForm({
           const foundBuilding = clientHit.buildings.find(
             (bld) => bld.serviceAddress1 === serviceReport.serviceAddress1
           );
+          if (foundBuilding) {
+            // parse phone number to ensure it follows the expected format
+            // add dashes to phone number
+            const formattedPhone = foundBuilding.contactPhone
+              .replace(/\D/g, "")
+              .replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
+            console.log("Formatted Phone:", formattedPhone);
+          }
           setBuilding(foundBuilding ?? null);
         }
       }
@@ -985,16 +993,17 @@ export default function ServiceReportForm({
       const data: { message: string; url: string; code: number } =
         await res.json();
       if (!res.ok) {
-        throw new Error(data.message || "PDF API error");
+        throw new Error(data.message || "Error generating PDF");
       }
       window.open(data.url, "_blank");
 
       toast.success(
         <span className="text-lg md:text-sm">PDF generated and downloaded</span>
       );
-    } catch {
+    } catch (error) {
+      console.error("Error generating PDF:", error);
       toast.error(
-        <span className="text-lg md:text-sm">Error generating PDF. Please try again.</span>
+        <span className="text-lg md:text-sm">Error generating PDF. Save draft a try again later.</span>
       );
     } finally {
       setSubmitting(false);

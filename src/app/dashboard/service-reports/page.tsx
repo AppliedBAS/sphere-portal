@@ -35,14 +35,14 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-import { useAuth } from "@/contexts/AuthContext";
+// import { useAuth } from "@/contexts/AuthContext";
 
 export default function ServiceReports() {
   const router = useRouter();
   const isMobile = useIsMobile();
   const [reports, setReports] = useState<ServiceReport[]>([]);
   const [loading, setLoading] = useState(true);
-  const { firebaseUser } = useAuth();
+  // const { firebaseUser } = useAuth();
 
   // --- Table state ---
   const [searchTerm, setSearchTerm] = useState("");
@@ -161,12 +161,12 @@ export default function ServiceReports() {
     return [...drafts, ...published];
   }, [sorted]);
 
-  const canEdit = (report: ServiceReport) => {
-    if (report.docId === 379) {
-      console.log(firebaseUser?.id, report.assignedTechnicianRef);
-    }
-    return report.draft && firebaseUser?.id === report.assignedTechnicianRef?.id
-  }
+  // const canEdit = (report: ServiceReport) => {
+  //   if (report.docId === 379) {
+  //     console.log(firebaseUser?.id, report.assignedTechnicianRef);
+  //   }
+  //   return report.draft && firebaseUser?.id === report.assignedTechnicianRef?.id
+  // }
 
   // 4) Paginate
   const pageCount = Math.ceil(withStatusOrder.length / pageSize);
@@ -362,7 +362,7 @@ export default function ServiceReports() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        {canEdit(report) && (
+                        {report.draft && (
                           <DropdownMenuItem asChild>
                             <Link href={`/dashboard/service-reports/${report.id}/edit`}>Edit</Link>
                           </DropdownMenuItem>

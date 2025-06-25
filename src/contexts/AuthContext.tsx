@@ -14,8 +14,6 @@ import {
   signOut,
   User,
   signInWithPopup,
-  setPersistence,
-  browserSessionPersistence,
 } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { Employee } from "@/models/Employee";
@@ -48,14 +46,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const router = useRouter();
 
   useEffect(() => {
-    (async () => {
-      try {
-        await setPersistence(auth, browserSessionPersistence);
-      } catch (error) {
-        console.error("Error setting auth persistence:", error);
-      }
-    })()
-    
     const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
       console.log("Auth state changed:", fbUser);
       setUser(fbUser);
@@ -86,12 +76,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     provider.setCustomParameters({
       prompt: "consent",
-      login_hint: "user@appliedbas.com",
       tenant: 'ad969dc0-5f48-4d4a-89bc-c5b5532c5d6b'
     });
+    
     try {
-      const result = await signInWithPopup(auth, provider);
-      console.log("Login result:", result);
+      await signInWithPopup(auth, provider);
     } catch (err) {
       console.error("Login error", err);
       throw err;
