@@ -56,10 +56,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           .catch((error) => {
             console.error("Error fetching employee data:", error);
             setFirebaseUser(null);
-          }).finally(() => {
-
-            router.replace("/dashboard");
-          });
+          })
       } else {
         setFirebaseUser(null);
         router.replace("/login");
