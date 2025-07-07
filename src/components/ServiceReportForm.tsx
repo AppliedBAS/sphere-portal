@@ -104,7 +104,9 @@ export default function ServiceReportForm({
   );
   const [submitting, setSubmitting] = useState<boolean>(false);
 
-  const [authorTechnician, setAuthorTechnician] = useState<Employee | null>(null);
+  const [authorTechnician, setAuthorTechnician] = useState<Employee | null>(
+    null
+  );
   const [assignedTechnician, setAssignedTechnician] = useState<Employee | null>(
     null
   );
@@ -755,7 +757,9 @@ export default function ServiceReportForm({
         building.serviceAddress1 +
         (building.serviceAddress2 ? ` ${building.serviceAddress2}` : ""),
       city_state_zip: building.cityStateZip,
-      contact_name: isWarranty ? `Warranty for ${building.contactName}` : building.contactName,
+      contact_name: isWarranty
+        ? `Warranty for ${building.contactName}`
+        : building.contactName,
       contact_phone: building.contactPhone,
       contact_email: building.contactEmail,
       signature: null,
@@ -1028,9 +1032,11 @@ export default function ServiceReportForm({
   }
 
   if (!user || !authorTechnician) {
-    return <div className="flex items-center justify-center">
-      <Loader2 className="animate-spin" />
-    </div>;
+    return (
+      <div className="flex items-center justify-center">
+        <Loader2 className="animate-spin" />
+      </div>
+    );
   }
 
   return (
@@ -1069,27 +1075,21 @@ export default function ServiceReportForm({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
+
       <form onSubmit={handleSubmit}>
         <div className="mt-4 flex flex-col gap-6">
           {/* === DocId === */}
-          { docId !== null && docId != 0 && (
+          {docId !== null && docId != 0 && (
             <div className="flex flex-col space-y-2">
               <Label htmlFor="docId" className="text-lg md:text-sm">
                 Report No.
               </Label>
-              <Input
-                id="docId"
-                type="text"
-                value={docId.toString()}
-              />
+              <Input id="docId" type="text" value={docId.toString()} />
             </div>
           )}
           {/* === Assigned Technician === */}
           <div className="flex flex-col space-y-2">
-            <Label htmlFor="authorTechnician">
-              Assigned Technician
-            </Label>
+            <Label htmlFor="authorTechnician">Assigned Technician</Label>
             <EmployeeSelect
               employees={technicians}
               loading={loadingEmployees}
@@ -1331,7 +1331,7 @@ export default function ServiceReportForm({
                             contactEmail: e.target.value,
                           }
                         : null
-                    )
+                    );
                     setEmails((prev) => {
                       const newEmails = [...prev];
                       newEmails[0] = e.target.value; // Always update the first email
@@ -1380,31 +1380,27 @@ export default function ServiceReportForm({
           )}
           {/* === Warranty Checkbox === */}
           <div className="flex items-center space-x-2">
-            <Label htmlFor="warrantySwitch">
-              Warranty Service
-            </Label>
+            <Label htmlFor="warrantySwitch">Warranty Service</Label>
             <Switch
               id="warrantySwitch"
               checked={isWarranty}
               onCheckedChange={handleWarrantyChange}
             />
-            <p className="text-base sm:text-sm">
-              {isWarranty ? "Yes" : "No"}
-            </p>
+            <p className="text-base sm:text-sm">{isWarranty ? "Yes" : "No"}</p>
           </div>
           <p className="text-base sm:text-sm text-muted-foreground">
-          If enabled, this will send the email to our system internally.
+            If enabled, this will send the email to our system internally.
           </p>
           {/* === Material Notes === */}
           <div className="flex flex-col space-y-2">
-          <Label htmlFor="materialNotes">Additional Materials</Label>
-          <Textarea
-            id="materialNotes"
-            value={materialNotes}
-            onChange={(e) => setMaterialNotes(e.target.value)}
-            placeholder="Optional materials used not already in POs"
-            rows={3}
-          />
+            <Label htmlFor="materialNotes">Additional Materials</Label>
+            <Textarea
+              id="materialNotes"
+              value={materialNotes}
+              onChange={(e) => setMaterialNotes(e.target.value)}
+              placeholder="Optional materials used not already in POs"
+              rows={3}
+            />
           </div>
 
           {/* === Service Notes === */}
@@ -1612,8 +1608,11 @@ export default function ServiceReportForm({
             <Label>Email Contacts</Label>
             <Label className="text-muted-foreground mt-2">
               <span className="text-card-foreground">
-              {assignedTechnician ? assignedTechnician.email : authorTechnician!.email!}
-              </span> is already included.
+                {assignedTechnician
+                  ? assignedTechnician.email
+                  : authorTechnician!.email!}
+              </span>{" "}
+              is already included.
             </Label>
 
             {emails.map((email, idx) => (
