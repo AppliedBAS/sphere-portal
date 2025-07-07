@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { firestore } from "@/lib/firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import type { ProjectReport } from "@/models/ProjectReport";
 import type { ServiceReport } from "@/models/ServiceReport";
 import type { PurchaseOrder } from "@/models/PurchaseOrder";
@@ -32,80 +32,95 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      const prSnap = await getDocs(
-        query(
-          collection(firestore, "project reports"),
-          where("draft", "==", true)
-        )
-      );
-      const srSnap = await getDocs(
-        query(collection(firestore, "reports"), where("draft", "==", true))
-      );
-      const poSnap = await getDocs(
-        query(collection(firestore, "orders"), where("status", "==", "OPEN"))
-      );
-      setData({
-        projectReports: prSnap.docs.map((d) => {
-          const data = d.data();
-          return {
-            id: d.id,
-            docId: data["doc-id"],
-            projectDocId: data["project-doc-id"],
-            clientName: data["client-name"],
-            location: data["location"],
-            description: data["description"],
-            notes: data["notes"],
-            materials: data["materials"],
-            draft: data["draft"],
-            createdAt: data["created-at"],
-            authorTechnicianRef: data["author-technician-ref"],
-            leadTechnicianRef: data["lead-technician-ref"],
-            assignedTechniciansRef: data["assigned-technicians-ref"],
-          } as ProjectReport;
-        }),
-        serviceReports: srSnap.docs.map((d) => {
-          const data = d.data();
-          return {
-            id: d.id,
-            authorTechnicianRef: data["author-technician-ref"],
-            cityStateZip: data["city-state-zip"],
-            clientName: data["client-name"],
-            contactEmail: data["contact-email"],
-            contactPhone: data["contact-phone"],
-            contactName: data["contact-name"],
-            createdAt: data["created-at"],
-            docId: data["doc-id"],
-            dateSigned: data["date-signed"],
-            draft: data["draft"],
-            materialNotes: data["material-notes"],
-            printedName: data["printed-name"],
-            serviceAddress1: data["service-address1"],
-            serviceAddress2: data["service-address2"],
-            serviceNotes: data["service-notes"],
-          } as ServiceReport;
-        }),
-        purchaseOrders: poSnap.docs.map((d) => {
-          const data = d.data();
-          return {
-            id: d.id,
-            amount: data["amount"],
-            createdAt: data["created-at"],
-            description: data["description"],
-            docId: data["doc-id"],
-            otherCategory: data["other-category"],
-            projectDocId: data["project-doc-id"],
-            serviceReportDocId: data["service-report-doc-id"],
-            status: data["status"],
-            technicianRef: data["technician-ref"],
-            vendor: data["vendor"],
-          } as PurchaseOrder;
-        }),
-      });
-      setLoading(false);
-    }
-    fetchData();
+    const unsubscribePR = onSnapshot(
+      query(collection(firestore, "project reports"), where("draft", "==", true)),
+      (snapshot) => {
+        setData((prevData) => ({
+          ...prevData,
+          projectReports: snapshot.docs.map((d) => {
+            const data = d.data();
+            return {
+              id: d.id,
+              docId: data["doc-id"],
+              projectDocId: data["project-doc-id"],
+              clientName: data["client-name"],
+              location: data["location"],
+              description: data["description"],
+              notes: data["notes"],
+              materials: data["materials"],
+              draft: data["draft"],
+              createdAt: data["created-at"],
+              authorTechnicianRef: data["author-technician-ref"],
+              leadTechnicianRef: data["lead-technician-ref"],
+              assignedTechniciansRef: data["assigned-technicians-ref"],
+            } as ProjectReport;
+          }),
+        }));
+      }
+    );
+
+    const unsubscribeSR = onSnapshot(
+      query(collection(firestore, "reports"), where("draft", "==", true)),
+      (snapshot) => {
+        setData((prevData) => ({
+          ...prevData,
+          serviceReports: snapshot.docs.map((d) => {
+            const data = d.data();
+            return {
+              id: d.id,
+              authorTechnicianRef: data["author-technician-ref"],
+              cityStateZip: data["city-state-zip"],
+              clientName: data["client-name"],
+              contactEmail: data["contact-email"],
+              contactPhone: data["contact-phone"],
+              contactName: data["contact-name"],
+              createdAt: data["created-at"],
+              docId: data["doc-id"],
+              dateSigned: data["date-signed"],
+              draft: data["draft"],
+              materialNotes: data["material-notes"],
+              printedName: data["printed-name"],
+              serviceAddress1: data["service-address1"],
+              serviceAddress2: data["service-address2"],
+              serviceNotes: data["service-notes"],
+            } as ServiceReport;
+          }),
+        }));
+      }
+    );
+
+    const unsubscribePO = onSnapshot(
+      query(collection(firestore, "orders"), where("status", "==", "OPEN")),
+      (snapshot) => {
+        setData((prevData) => ({
+          ...prevData,
+          purchaseOrders: snapshot.docs.map((d) => {
+            const data = d.data();
+            return {
+              id: d.id,
+              amount: data["amount"],
+              createdAt: data["created-at"],
+              description: data["description"],
+              docId: data["doc-id"],
+              otherCategory: data["other-category"],
+              projectDocId: data["project-doc-id"],
+              serviceReportDocId: data["service-report-doc-id"],
+              status: data["status"],
+              technicianRef: data["technician-ref"],
+              vendor: data["vendor"],
+            } as PurchaseOrder;
+          }),
+        }));
+      }
+    );
+
+    setLoading(false);
+
+    return () => {
+      unsubscribePR();
+      unsubscribeSR();
+      unsubscribePO();
+    };
   }, []);
 
   const renderPurchaseOrderCards = (items: PurchaseOrder[]) => (

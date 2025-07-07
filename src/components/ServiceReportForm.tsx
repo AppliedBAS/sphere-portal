@@ -104,9 +104,7 @@ export default function ServiceReportForm({
   );
   const [submitting, setSubmitting] = useState<boolean>(false);
 
-  const [authorTechnician, setAuthorTechnician] = useState<Employee | null>(
-    firebaseUser
-  );
+  const [authorTechnician, setAuthorTechnician] = useState<Employee | null>(null);
   const [assignedTechnician, setAssignedTechnician] = useState<Employee | null>(
     null
   );
@@ -157,7 +155,13 @@ export default function ServiceReportForm({
       },
     ]
   );
-  // If editing an existing report, load its author technician (and any pre‐saved client fields)
+
+  useEffect(() => {
+    if (firebaseUser) {
+      setAuthorTechnician(firebaseUser);
+    }
+  }, [firebaseUser]);
+
   useEffect(() => {
     async function initForm() {
       if (!serviceReport) return;
@@ -168,6 +172,10 @@ export default function ServiceReportForm({
         const empSnap = await getDoc(empRef);
         if (empSnap.exists()) {
           setAuthorTechnician(empSnap.data() as Employee);
+        } else {
+          console.info(
+            "Author technician not found in Firestore, using current user"
+          );
         }
       }
 
@@ -302,6 +310,19 @@ export default function ServiceReportForm({
       toast.error(
         <span className="text-lg md:text-sm">Failed to save contact info.</span>
       );
+    }
+  };
+
+  const handleWarrantyChange = (checked: boolean) => {
+    setIsWarranty(checked);
+    if (checked) {
+      // remove building contact info when warranty is checked
+      setEmails([]);
+    } else {
+      // restore building contact info when warranty is unchecked
+      if (building) {
+        setEmails([building.contactEmail]);
+      }
     }
   };
 
@@ -734,7 +755,7 @@ export default function ServiceReportForm({
         building.serviceAddress1 +
         (building.serviceAddress2 ? ` ${building.serviceAddress2}` : ""),
       city_state_zip: building.cityStateZip,
-      contact_name: isWarranty ? "Warranty Department" : building.contactName,
+      contact_name: isWarranty ? `Warranty for ${building.contactName}` : building.contactName,
       contact_phone: building.contactPhone,
       contact_email: building.contactEmail,
       signature: null,
@@ -1006,6 +1027,12 @@ export default function ServiceReportForm({
     setEmails((prevEmails) => [...prevEmails, ""]);
   }
 
+  if (!user || !authorTechnician) {
+    return <div className="flex items-center justify-center">
+      <Loader2 className="animate-spin" />
+    </div>;
+  }
+
   return (
     <>
       {/* AI Rephrase Dialog */}
@@ -1042,25 +1069,25 @@ export default function ServiceReportForm({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
+      
       <form onSubmit={handleSubmit}>
         <div className="mt-4 flex flex-col gap-6">
           {/* === DocId === */}
-          <div className="flex flex-col space-y-2">
-            <Label htmlFor="docId" className="text-lg md:text-sm">
-              Report No.
-            </Label>
-            <Input
-              id="docId"
-              type="text"
-              value={docId !== null ? docId.toString() : ""}
-              readOnly
-              className="w-full md:max-w-96"
-            />
-          </div>
+          { docId !== null && docId != 0 && (
+            <div className="flex flex-col space-y-2">
+              <Label htmlFor="docId" className="text-lg md:text-sm">
+                Report No.
+              </Label>
+              <Input
+                id="docId"
+                type="text"
+                value={docId.toString()}
+              />
+            </div>
+          )}
           {/* === Assigned Technician === */}
           <div className="flex flex-col space-y-2">
-            <Label htmlFor="authorTechnician" className="text-lg md:text-sm">
+            <Label htmlFor="authorTechnician">
               Assigned Technician
             </Label>
             <EmployeeSelect
@@ -1072,7 +1099,7 @@ export default function ServiceReportForm({
               setSelectedEmployee={setAssignedTechnician}
               placeholder="Select Technician..."
             />
-            <p className="text-base md:text-sm text-muted-foreground mt-1">
+            <p className="text-base sm:text-sm text-muted-foreground mt-2">
               Leave blank if you are the assigned technician.
             </p>
           </div>
@@ -1111,7 +1138,9 @@ export default function ServiceReportForm({
 
                       if (found) {
                         setBuilding(found);
-                        setEmails([found.contactEmail]);
+                        if (!isWarranty) {
+                          setEmails([found.contactEmail]);
+                        }
                         // Set as original contact
                         setOriginalContact({
                           contactName: found.contactName ?? "",
@@ -1351,28 +1380,31 @@ export default function ServiceReportForm({
           )}
           {/* === Warranty Checkbox === */}
           <div className="flex items-center space-x-2">
-            <Label htmlFor="warrantySwitch" className="text-lg md:text-sm">
+            <Label htmlFor="warrantySwitch">
               Warranty Service
             </Label>
             <Switch
               id="warrantySwitch"
               checked={isWarranty}
-              onCheckedChange={(checked: boolean) => setIsWarranty(checked)}
+              onCheckedChange={handleWarrantyChange}
             />
-            <span className="text-lg md:text-sm">
+            <p className="text-base sm:text-sm">
               {isWarranty ? "Yes" : "No"}
-            </span>
+            </p>
           </div>
+          <p className="text-base sm:text-sm text-muted-foreground">
+          If enabled, this will send the email to our system internally.
+          </p>
           {/* === Material Notes === */}
           <div className="flex flex-col space-y-2">
-            <Label htmlFor="materialNotes">Additional Materials</Label>
-            <Textarea
-              id="materialNotes"
-              value={materialNotes}
-              onChange={(e) => setMaterialNotes(e.target.value)}
-              placeholder="Optional materials used not already in POs"
-              rows={3}
-            />
+          <Label htmlFor="materialNotes">Additional Materials</Label>
+          <Textarea
+            id="materialNotes"
+            value={materialNotes}
+            onChange={(e) => setMaterialNotes(e.target.value)}
+            placeholder="Optional materials used not already in POs"
+            rows={3}
+          />
           </div>
 
           {/* === Service Notes === */}
@@ -1576,20 +1608,13 @@ export default function ServiceReportForm({
 
           {/* Add List of Contact to Send Email To */}
           {/* Create list of inputs per contact email, buttons to remove and add contact emails */}
-          <div className="mt-6 ">
-            <span className="text-lg md:text-sm">Email Contacts</span>
-            <p className="text-base md:text-xs text-muted-foreground">
-              Note: Building contact and assigned technician email are
-              automatically included.
-            </p>
-            <p className="text-base md:text-xs text-muted-foreground">
-              <span className="text-card-foreground">
-              {building?.contactEmail || 'N/A'}
-              </span> and{" "}
+          <div className="mt-6">
+            <Label>Email Contacts</Label>
+            <Label className="text-muted-foreground mt-2">
               <span className="text-card-foreground">
               {assignedTechnician ? assignedTechnician.email : authorTechnician!.email!}
-              </span> are already included.
-            </p>
+              </span> is already included.
+            </Label>
 
             {emails.map((email, idx) => (
               <div key={idx} className="flex items-center gap-2 mt-2">
