@@ -97,8 +97,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     
     signInWithPopup(auth, provider)
       .then((result) => {
-        const credential = OAuthProvider.credentialFromResult(result);
-        const token = credential?.accessToken;
         const user = result.user;
         console.log("User signed in:", user.email);
         // Optionally, you can redirect to a specific page after login

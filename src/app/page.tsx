@@ -6,7 +6,7 @@ import { useEffect } from "react";
 
 export default function Home() {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user } = useAuth();
   useEffect(() => {
     if (user) {
       console.log("User is authenticated, redirecting to dashboard");

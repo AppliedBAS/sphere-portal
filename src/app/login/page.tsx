@@ -32,7 +32,7 @@ export default function LoginPage() {
       .catch(error => {
         console.error('Redirect sign-in error:', error);
       });
-  }, []);
+  }, [router, user]);
 
   const toggleTheme = () => {
     setTheme(theme === "light" ? "dark" : "light");
