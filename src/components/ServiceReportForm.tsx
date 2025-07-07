@@ -3,7 +3,7 @@
 import openAIClient from "@/lib/openai";
 import { useState, useEffect, FormEvent } from "react";
 import EmployeeSelect from "@/components/EmployeeSelect";
-import { Employee } from "@/models/Employee";
+import { Employee, employeeConverter } from "@/models/Employee";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -93,7 +93,9 @@ export default function ServiceReportForm({
 
   const { user, firebaseUser } = useAuth();
   const [rephraseDialogOpen, setRephraseDialogOpen] = useState(false);
-  const [currentRephraseIndex, setCurrentRephraseIndex] = useState<number | null>(null);
+  const [currentRephraseIndex, setCurrentRephraseIndex] = useState<
+    number | null
+  >(null);
   const [rephrase, setRephrase] = useState<string | null>(null);
   const [isRephrasing, setIsRephrasing] = useState<boolean>(false);
   const [isNewReport, setIsNewReport] = useState<boolean>(!serviceReport);
@@ -103,15 +105,13 @@ export default function ServiceReportForm({
   const [submitting, setSubmitting] = useState<boolean>(false);
 
   const [authorTechnician, setAuthorTechnician] = useState<Employee | null>(
-    firebaseUser
+    null
   );
   const [assignedTechnician, setAssignedTechnician] = useState<Employee | null>(
     null
   );
 
-  const [docId, setDocId] = useState<number | null>(
-    serviceReport?.docId || 0
-  );
+  const [docId, setDocId] = useState<number | null>(serviceReport?.docId || 0);
   // The chosen client (from ClientSelect)
   const [client, setClient] = useState<ClientHit | null>(null);
 
@@ -121,7 +121,7 @@ export default function ServiceReportForm({
   const [materialNotes, setMaterialNotes] = useState<string>(
     serviceReport?.materialNotes || ""
   );
-
+  const [emails, setEmails] = useState<string[]>([]);
   // Add state for dialog and new building form
   const [addBuildingOpen, setAddBuildingOpen] = useState(false);
   const [newBuilding, setNewBuilding] = useState({
@@ -157,39 +157,36 @@ export default function ServiceReportForm({
       },
     ]
   );
-  // If editing an existing report, load its author technician (and any pre‐saved client fields)
+
+  useEffect(() => {
+    if (firebaseUser) {
+      setAuthorTechnician(firebaseUser);
+    }
+  }, [firebaseUser]);
+
   useEffect(() => {
     async function initForm() {
       if (!serviceReport) return;
-
       // Populate authorTechnician from a DocumentReference, if present
       if (serviceReport.authorTechnicianRef) {
-        const empSnap = await getDoc(serviceReport.authorTechnicianRef);
+        const empRef =
+          serviceReport.authorTechnicianRef.withConverter(employeeConverter);
+        const empSnap = await getDoc(empRef);
         if (empSnap.exists()) {
-          const data = empSnap.data();
-          setAuthorTechnician({
-            id: empSnap.id,
-            clientId: data["client-id"],
-            clientSecret: data["client-secret"],
-            createdAt: data["created-at"],
-            updatedAt: data["updated-at"],
-            ...data,
-          } as Employee);
+          setAuthorTechnician(empSnap.data() as Employee);
+        } else {
+          console.info(
+            "Author technician not found in Firestore, using current user"
+          );
         }
       }
 
       if (serviceReport.assignedTechnicianRef) {
-        const empSnap = await getDoc(serviceReport.assignedTechnicianRef);
+        const empRef =
+          serviceReport.assignedTechnicianRef.withConverter(employeeConverter);
+        const empSnap = await getDoc(empRef);
         if (empSnap.exists()) {
-          const data = empSnap.data();
-          setAssignedTechnician({
-            id: empSnap.id,
-            clientId: data["client-id"],
-            clientSecret: data["client-secret"],
-            createdAt: data["created-at"],
-            updatedAt: data["updated-at"],
-            ...data,
-          } as Employee);
+          setAssignedTechnician(empSnap.data() as Employee);
         }
       }
       // Populate client from serviceReport.clientName if available
@@ -223,6 +220,7 @@ export default function ServiceReportForm({
           const foundBuilding = clientHit.buildings.find(
             (bld) => bld.serviceAddress1 === serviceReport.serviceAddress1
           );
+          setEmails(foundBuilding ? [foundBuilding.contactEmail] : []);
           setBuilding(foundBuilding ?? null);
         }
       }
@@ -317,6 +315,19 @@ export default function ServiceReportForm({
     }
   };
 
+  const handleWarrantyChange = (checked: boolean) => {
+    setIsWarranty(checked);
+    if (checked) {
+      // remove building contact info when warranty is checked
+      setEmails([]);
+    } else {
+      // restore building contact info when warranty is unchecked
+      if (building) {
+        setEmails([building.contactEmail]);
+      }
+    }
+  };
+
   const handleRephrase = async (index: number) => {
     if (!user || !authorTechnician) {
       toast.error(
@@ -344,7 +355,8 @@ export default function ServiceReportForm({
       }
       const response = await openAIClient.responses.create({
         model: "gpt-4",
-        instructions: "Rephrase the service note for clarity and professionalism.",
+        instructions:
+          "Rephrase the service note for clarity and professionalism.",
         input: noteToRephrase,
       });
 
@@ -360,7 +372,7 @@ export default function ServiceReportForm({
       setSubmitting(false);
       setIsRephrasing(false);
     }
-  }
+  };
 
   const handleRephraseConfirm = (index: number) => {
     if (rephrase) {
@@ -371,14 +383,16 @@ export default function ServiceReportForm({
       );
       setRephrase(null);
       toast.success(
-        <span className="text-lg md:text-sm">Service note rephrased successfully!</span>
+        <span className="text-lg md:text-sm">
+          Service note rephrased successfully!
+        </span>
       );
     } else {
       toast.error(
         <span className="text-lg md:text-sm">No rephrased text available.</span>
       );
     }
-  }
+  };
 
   const handleSaveDraft = async () => {
     setSubmitting(true);
@@ -649,7 +663,7 @@ export default function ServiceReportForm({
 
     // Reserve or use existing docId
     let currentDocId = docId;
-    let id = serviceReport?.id
+    let id = serviceReport?.id;
     if (isNewReport) {
       currentDocId = await reserveDocid();
       setDocId(currentDocId);
@@ -743,7 +757,9 @@ export default function ServiceReportForm({
         building.serviceAddress1 +
         (building.serviceAddress2 ? ` ${building.serviceAddress2}` : ""),
       city_state_zip: building.cityStateZip,
-      contact_name: isWarranty ? "Warranty Department" : building.contactName,
+      contact_name: isWarranty
+        ? `Warranty for ${building.contactName}`
+        : building.contactName,
       contact_phone: building.contactPhone,
       contact_email: building.contactEmail,
       signature: null,
@@ -778,7 +794,7 @@ export default function ServiceReportForm({
       technician_email: authorTechnician.email,
       print_name: null,
       sign_date: null,
-      to_emails: isWarranty ? [] : [building.contactEmail],
+      to_emails: emails,
       start_date: formatDate(firstDate),
       end_date: formatDate(lastDate),
     };
@@ -985,21 +1001,43 @@ export default function ServiceReportForm({
       const data: { message: string; url: string; code: number } =
         await res.json();
       if (!res.ok) {
-        throw new Error(data.message || "PDF API error");
+        throw new Error(data.message || "Error generating PDF");
       }
       window.open(data.url, "_blank");
 
       toast.success(
         <span className="text-lg md:text-sm">PDF generated and downloaded</span>
       );
-    } catch {
+    } catch (error) {
+      console.error("Error generating PDF:", error);
       toast.error(
-        <span className="text-lg md:text-sm">Error generating PDF. Please try again.</span>
+        <span className="text-lg md:text-sm">
+          Error generating PDF. Save draft a try again later.
+        </span>
       );
     } finally {
       setSubmitting(false);
     }
   };
+
+  function handleRemoveEmail(idx: number): void {
+    setEmails((prevEmails) => prevEmails.filter((_, index) => index !== idx));
+  }
+
+  function handleAddEmail(
+    event: React.MouseEvent<HTMLButtonElement, MouseEvent>
+  ): void {
+    event.preventDefault();
+    setEmails((prevEmails) => [...prevEmails, ""]);
+  }
+
+  if (!user || !authorTechnician) {
+    return (
+      <div className="flex items-center justify-center">
+        <Loader2 className="animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <>
@@ -1009,25 +1047,29 @@ export default function ServiceReportForm({
           <DialogHeader>
             <DialogTitle>AI Rephrase</DialogTitle>
           </DialogHeader>
-          { isRephrasing ? (
+          {isRephrasing ? (
             <div className="flex items-center justify-center">
               <Loader2 className="animate-spin h-6 w-6 text-muted-foreground" />
               <span className="ml-2">Rephrasing...</span>
             </div>
-            ) : (
-              <Textarea value={rephrase ?? ''} readOnly rows={4} />
-            )}
+          ) : (
+            <Textarea value={rephrase ?? ""} readOnly rows={4} />
+          )}
           <DialogFooter>
             <Button
               onClick={() => {
-                if (currentRephraseIndex !== null) handleRephraseConfirm(currentRephraseIndex);
+                if (currentRephraseIndex !== null)
+                  handleRephraseConfirm(currentRephraseIndex);
                 setRephraseDialogOpen(false);
               }}
               disabled={!rephrase}
             >
               Confirm
             </Button>
-            <Button variant="outline" onClick={() => setRephraseDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setRephraseDialogOpen(false)}
+            >
               Cancel
             </Button>
           </DialogFooter>
@@ -1037,23 +1079,17 @@ export default function ServiceReportForm({
       <form onSubmit={handleSubmit}>
         <div className="mt-4 flex flex-col gap-6">
           {/* === DocId === */}
-          <div className="flex flex-col space-y-2">
-            <Label htmlFor="docId" className="text-lg md:text-sm">
-              Report No.
-            </Label>
-            <Input
-              id="docId"
-              type="text"
-              value={docId !== null ? docId.toString() : ""}
-              readOnly
-              className="w-full md:max-w-96"
-            />
-          </div>
+          {docId !== null && docId != 0 && (
+            <div className="flex flex-col space-y-2">
+              <Label htmlFor="docId" className="text-lg md:text-sm">
+                Report No.
+              </Label>
+              <Input id="docId" type="text" value={docId.toString()} />
+            </div>
+          )}
           {/* === Assigned Technician === */}
           <div className="flex flex-col space-y-2">
-            <Label htmlFor="authorTechnician" className="text-lg md:text-sm">
-              Assigned Technician
-            </Label>
+            <Label htmlFor="authorTechnician">Assigned Technician</Label>
             <EmployeeSelect
               employees={technicians}
               loading={loadingEmployees}
@@ -1063,7 +1099,7 @@ export default function ServiceReportForm({
               setSelectedEmployee={setAssignedTechnician}
               placeholder="Select Technician..."
             />
-            <p className="text-base md:text-sm text-muted-foreground mt-1">
+            <p className="text-base sm:text-sm text-muted-foreground mt-2">
               Leave blank if you are the assigned technician.
             </p>
           </div>
@@ -1102,6 +1138,9 @@ export default function ServiceReportForm({
 
                       if (found) {
                         setBuilding(found);
+                        if (!isWarranty) {
+                          setEmails([found.contactEmail]);
+                        }
                         // Set as original contact
                         setOriginalContact({
                           contactName: found.contactName ?? "",
@@ -1111,10 +1150,7 @@ export default function ServiceReportForm({
                       }
                     }}
                   >
-                    <SelectTrigger
-                      id="buildingSelect"
-                      className="w-full"
-                    >
+                    <SelectTrigger id="buildingSelect" className="w-full">
                       <SelectValue placeholder="Select a building..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -1195,7 +1231,10 @@ export default function ServiceReportForm({
                         id="new_cityStateZip"
                         value={newBuilding.cityStateZip}
                         onChange={(e) =>
-                          handleNewBuildingChange("cityStateZip", e.target.value)
+                          handleNewBuildingChange(
+                            "cityStateZip",
+                            e.target.value
+                          )
                         }
                         required
                       />
@@ -1217,7 +1256,10 @@ export default function ServiceReportForm({
                         id="new_contactEmail"
                         value={newBuilding.contactEmail}
                         onChange={(e) =>
-                          handleNewBuildingChange("contactEmail", e.target.value)
+                          handleNewBuildingChange(
+                            "contactEmail",
+                            e.target.value
+                          )
                         }
                         type="email"
                         required
@@ -1233,8 +1275,6 @@ export default function ServiceReportForm({
                           handleNewBuildingChange("contactPhone", formatted);
                         }}
                         type="tel"
-                        pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}"
-                        maxLength={12}
                         required
                       />
                     </div>
@@ -1283,7 +1323,7 @@ export default function ServiceReportForm({
                 <Input
                   id="contactEmail"
                   value={building.contactEmail}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setBuilding((prev) =>
                       prev
                         ? {
@@ -1291,8 +1331,13 @@ export default function ServiceReportForm({
                             contactEmail: e.target.value,
                           }
                         : null
-                    )
-                  }
+                    );
+                    setEmails((prev) => {
+                      const newEmails = [...prev];
+                      newEmails[0] = e.target.value; // Always update the first email
+                      return newEmails;
+                    });
+                  }}
                   placeholder="Contact Email"
                   type="email"
                 />
@@ -1309,8 +1354,6 @@ export default function ServiceReportForm({
                     );
                   }}
                   type="tel"
-                  pattern="[0-9]{3}-[0-9]{3}-[0-9]{4}"
-                  maxLength={12}
                   placeholder="Contact Phone"
                 />
               </div>
@@ -1326,10 +1369,10 @@ export default function ServiceReportForm({
                   </Button>
                   <Button
                     type="button"
-                    variant="secondary"
+                    variant="default"
                     onClick={handleSaveContact}
                   >
-                    Save Contact Information
+                    Update Contact
                   </Button>
                 </div>
               )}
@@ -1337,18 +1380,17 @@ export default function ServiceReportForm({
           )}
           {/* === Warranty Checkbox === */}
           <div className="flex items-center space-x-2">
-            <Label htmlFor="warrantySwitch" className="text-lg md:text-sm">
-              Warranty Service
-            </Label>
+            <Label htmlFor="warrantySwitch">Warranty Service</Label>
             <Switch
               id="warrantySwitch"
               checked={isWarranty}
-              onCheckedChange={(checked: boolean) => setIsWarranty(checked)}
+              onCheckedChange={handleWarrantyChange}
             />
-            <span className="text-lg md:text-sm">
-              {isWarranty ? "Yes" : "No"}
-            </span>
+            <p className="text-base sm:text-sm">{isWarranty ? "Yes" : "No"}</p>
           </div>
+          <p className="text-base sm:text-sm text-muted-foreground">
+            If enabled, this will send the email to our system internally.
+          </p>
           {/* === Material Notes === */}
           <div className="flex flex-col space-y-2">
             <Label htmlFor="materialNotes">Additional Materials</Label>
@@ -1441,7 +1483,11 @@ export default function ServiceReportForm({
                       <TimeSelect
                         selectedTime={note.technicianOvertime}
                         setSelectedTime={(val: string) =>
-                          handleServiceNoteChange(idx, "technicianOvertime", val)
+                          handleServiceNoteChange(
+                            idx,
+                            "technicianOvertime",
+                            val
+                          )
                         }
                       />
                     </div>
@@ -1449,7 +1495,10 @@ export default function ServiceReportForm({
                   {/* Helper Time */}
                   <div className="flex flex-col md:flex-row md:gap-4 space-y-4">
                     <div className="flex flex-col">
-                      <Label htmlFor={`helperTime_${idx}`} className="mb-2 block">
+                      <Label
+                        htmlFor={`helperTime_${idx}`}
+                        className="mb-2 block"
+                      >
                         Helper Time
                       </Label>
                       <TimeSelect
@@ -1518,8 +1567,11 @@ export default function ServiceReportForm({
                       size="sm"
                       variant="outline"
                       onClick={() => {
-                         const wordCount = note.notes.trim().split(/\s+/).filter(w => w).length;
-                         if (wordCount < 6) {
+                        const wordCount = note.notes
+                          .trim()
+                          .split(/\s+/)
+                          .filter((w) => w).length;
+                        if (wordCount < 6) {
                           toast.error(
                             <span className="text-lg md:text-sm">
                               Please enter at least 6 words before rephrasing.
@@ -1550,36 +1602,82 @@ export default function ServiceReportForm({
             </Button>
           </div>
 
-          {/* === Preview/Save/Submit Buttons === */}
-          <div className="mt-8 flex gap-4 mb-8">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={submitting || !client || !building}
-              onClick={handleGeneratePDF}
-            >
-              Preview
-            </Button>
-            <Button
-              type="button"
-              disabled={submitting || !client || !building}
-              variant="outline"
-              onClick={handleSaveDraft}
-            >
-              Save
-            </Button>
-            <Button
-              type="submit"
-              disabled={submitting || !client || !building}
-              variant="default"
-            >
-              Submit
-            </Button>
-            {submitting && (
-              <div className="my-auto">
-                <Loader2 className="animate-spin text-muted-foreground" />
+          {/* Add List of Contact to Send Email To */}
+          {/* Create list of inputs per contact email, buttons to remove and add contact emails */}
+          <div className="mt-6">
+            <Label>Email Contacts</Label>
+            <Label className="text-muted-foreground mt-2">
+              <span className="text-card-foreground">
+                {assignedTechnician
+                  ? assignedTechnician.email
+                  : authorTechnician!.email!}
+              </span>{" "}
+              is already included.
+            </Label>
+
+            {emails.map((email, idx) => (
+              <div key={idx} className="flex items-center gap-2 mt-2">
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => {
+                    const newEmails = [...emails];
+                    newEmails[idx] = e.target.value;
+                    setEmails(newEmails);
+                  }}
+                  placeholder="Contact Email"
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => handleRemoveEmail(idx)}
+                >
+                  Remove
+                </Button>
               </div>
-            )}
+            ))}
+            <Button
+              type="button"
+              variant="secondary"
+              className="mt-2"
+              onClick={handleAddEmail}
+            >
+              Add Email Contact
+            </Button>
+
+            {/* === Preview/Save/Submit Buttons === */}
+            <div className="mt-8 flex gap-4 mb-8">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={submitting || !client || !building}
+                onClick={handleGeneratePDF}
+              >
+                Preview
+              </Button>
+              <Button
+                type="button"
+                disabled={submitting || !client || !building}
+                variant="outline"
+                onClick={handleSaveDraft}
+              >
+                Save
+              </Button>
+              <Button
+                type="submit"
+                disabled={submitting || !client || !building}
+                variant="default"
+              >
+                Submit
+              </Button>
+              {submitting && (
+                <div className="my-auto">
+                  <Loader2 className="animate-spin text-muted-foreground" />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </form>

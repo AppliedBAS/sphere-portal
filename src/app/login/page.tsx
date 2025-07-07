@@ -4,17 +4,42 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { SunMoonIcon } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { getRedirectResult, OAuthProvider } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 export default function LoginPage() {
-  const { user, loading, login } = useAuth();
+  const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const { user, loading, login } = useAuth();
 
-  if (loading) return <p>Loading…</p>;
-  if (user) return <p>Redirecting…</p>;
+  useEffect(() => {
+    if (user) {
+      router.replace("/dashboard");
+      return;
+    }
+    
+    getRedirectResult(auth)
+      .then(result => {
+        if (!result) return; // No result means no redirect sign-in attempted
+        // Signed in
+        const user = result.user;
+        console.log('Signed in via redirect as', user.email);
+        const credential = OAuthProvider.credentialFromResult(result);
+        console.log('Access Token:', credential?.accessToken);
+      })
+      .catch(error => {
+        console.error('Redirect sign-in error:', error);
+      });
+  }, []);
 
   const toggleTheme = () => {
     setTheme(theme === "light" ? "dark" : "light");
   };
+
+  if (loading) return <p>Loading…</p>;
+  if (user) return <p>Redirecting…</p>;
 
   return (
     <div className="fixed inset-0 flex items-center justify-center">

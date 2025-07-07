@@ -3,8 +3,8 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { firestore } from "@/lib/firebase";
-import { doc, DocumentData, getDoc } from "firebase/firestore";
-import { ServiceReport } from "@/models/ServiceReport";
+import { collection, doc, getDoc } from "firebase/firestore";
+import { ServiceReport, serviceReportConverter } from "@/models/ServiceReport";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -16,87 +16,48 @@ import {
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Pencil } from "lucide-react";
-// import { useAuth } from "@/contexts/AuthContext";
+import { employeeConverter, Employee } from "@/models/Employee";
 
 const ServiceReportViewPage = () => {
   const { id } = useParams();
   const [report, setReport] = useState<ServiceReport | null>(null);
   const [loading, setLoading] = useState(true);
-  // const { firebaseUser } = useAuth();
+  const [authorTechnician, setAuthorTechnician] = useState<Employee | null>(null);
+  const [assignedTechnician, setAssignedTechnician] = useState<Employee | null>(null);
 
   useEffect(() => {
     async function fetchReport() {
       if (!id) return;
       setLoading(true);
-      const ref = doc(firestore, "reports", id as string);
-      const snap = await getDoc(ref);
+      const collectionRef = collection(firestore, "reports").withConverter(serviceReportConverter);
+      const docRef = doc(collectionRef, id as string);
+      const snap = await getDoc(docRef);
       if (snap.exists()) {
-        const data: DocumentData = snap.data();
-        setReport({
-          id: snap.id,
-          authorTechnicianRef: data["author-technician-ref"],
-          docId: data["doc-id"],
-          clientName: data["client-name"],
-          serviceAddress1: data["service-address1"],
-          serviceAddress2: data["service-address2"],
-          cityStateZip: data["city-state-zip"],
-          contactName: data["contact-name"],
-          contactPhone: data["contact-phone"],
-          contactEmail: data["contact-email"],
-          materialNotes: data["material-notes"],
-          serviceNotes: Array.isArray(data["service-notes"])
-            ? data["service-notes"].map((note: unknown): ServiceReport["serviceNotes"][number] => {
-                if (
-                  typeof note === "object" &&
-                  note !== null &&
-                  "date" in note &&
-                  "helper-overtime" in note &&
-                  "helper-time" in note &&
-                  "remote-work" in note &&
-                  "service-notes" in note &&
-                  "technician-overtime" in note &&
-                  "technician-time" in note
-                ) {
-                  const n = note as Record<string, unknown>;
-                  return {
-                    date: n["date"] as ServiceReport["serviceNotes"][number]["date"],
-                    helperOvertime: String(n["helper-overtime"] ?? ""),
-                    helperTime: String(n["helper-time"] ?? ""),
-                    remoteWork: String(n["remote-work"] ?? ""),
-                    serviceNotes: String(n["service-notes"] ?? ""),
-                    technicianOvertime: String(n["technician-overtime"] ?? ""),
-                    technicianTime: String(n["technician-time"] ?? ""),
-                  };
-                }
-                // fallback: empty ServiceNote with minimal valid Timestamp
-                return {
-                  date: new Date(0) as unknown as ServiceReport["serviceNotes"][number]["date"],
-                  helperOvertime: "",
-                  helperTime: "",
-                  remoteWork: "",
-                  serviceNotes: "",
-                  technicianOvertime: "",
-                  technicianTime: "",
-                };
-              })
-            : [],
-          createdAt: data["created-at"],
-          dateSigned: data["date-signed"],
-          draft: data["draft"],
-          printedName: data["printed-name"],
-          ...snap.data(),
-        } as ServiceReport);
-      }      
-
+        const data: ServiceReport = snap.data();
+        setReport(data);
+        
+        const authorTechnicianRef = data.authorTechnicianRef.withConverter(employeeConverter);
+        const authorTechnicianSnap = await getDoc(authorTechnicianRef);
+        
+        setAuthorTechnician(authorTechnicianSnap.exists()
+          ? authorTechnicianSnap.data()
+          : null);
+        
+        if (!data.assignedTechnicianRef) {
+          setLoading(false);
+          return;
+        }
+        const assignedTechnicianRef = data.assignedTechnicianRef.withConverter(employeeConverter);
+        const assignedTechnicianSnap = await getDoc(assignedTechnicianRef);
+        setAssignedTechnician(assignedTechnicianSnap.exists()
+          ? assignedTechnicianSnap.data()
+          : null);
+      }
+      
       setLoading(false);
     }
     fetchReport();
   }, [id]);
-
-  // const canEdit = (report: ServiceReport) => (
-  //   (firebaseUser?.policy.includes("SERVICE_REPORT_EDIT_SELF") && report?.authorTechnicianRef.id === firebaseUser.id)
-  //   || firebaseUser?.policy.includes("SERVICE_REPORT_ACCESS_FULL") || report?.assignedTechnicianRef?.id === firebaseUser?.id
-  // );
 
   if (loading) return <div>Loading…</div>;
   if (!report) return <div>Service Report not found.</div>;
@@ -143,6 +104,7 @@ const ServiceReportViewPage = () => {
       <div className="grid grid-cols-1 gap-6">
         {/* Left: Main Info */}
         <Card className="p-4 space-y-4 relative text-lg md:text-base">
+          <h2 className="text-xl font-semibold mb-4">Report Details</h2>
           {/* Edit icon for main info */}
           {report.draft && (
             <div className="absolute top-4 right-4 z-10">
@@ -174,16 +136,38 @@ const ServiceReportViewPage = () => {
             <div className="font-semibold">City/State/ZIP</div>
             <div>{report.cityStateZip}</div>
           </div>
+          {/* Contact Info */}
           <div>
             <div className="font-semibold">Contact</div>
-            <div>
-              {report.contactName}{" "}
-              {report.contactPhone && `(${report.contactPhone})`}
-            </div>
+              {report.contactName && <div>{report.contactName}</div>}
+              {report.contactPhone && <div>{report.contactPhone}</div>}
+              {report.contactEmail && <div>{report.contactEmail}</div>}
           </div>
+          {/* Author Technician */}
           <div>
-            <div className="font-semibold">Contact Email</div>
-            <div>{report.contactEmail}</div>
+            <div className="font-semibold">Author Technician</div>
+            {authorTechnician ? (
+              <>
+                {authorTechnician?.name && <div>{authorTechnician.name}</div>}
+                {authorTechnician?.phone && <div>{authorTechnician.phone}</div>}
+                {authorTechnician?.email && <div>{authorTechnician.email}</div>}
+              </>
+            ) : (
+              <div className="text-muted-foreground">None</div>
+            )}
+          </div>
+          {/* Assigned Technician */}
+          <div>
+            <div className="font-semibold">Assigned Technician</div>
+            {assignedTechnician ? (
+              <>
+                {assignedTechnician?.name && <div>{assignedTechnician.name}</div>}
+                {assignedTechnician?.phone && <div>{assignedTechnician.phone}</div>}
+                {assignedTechnician?.email && <div>{assignedTechnician.email}</div>}
+              </>
+            ) : (
+              <div className="text-muted-foreground">None</div>
+            )}
           </div>
           <div>
             <div className="font-semibold">Material Notes</div>
@@ -197,15 +181,21 @@ const ServiceReportViewPage = () => {
             <div className="font-semibold">Created At</div>
             <div>
               {report.createdAt && "toDate" in report.createdAt
-                ? report.createdAt.toDate().toLocaleString()
-                : ""}
+                ? report.createdAt.toDate().toLocaleTimeString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "Unable to parse date"}
             </div>
           </div>
         </Card>
 
         {/* Right: Service Notes */}
         <Card className="p-4 relative text-lg md:text-base">
-          <h2 className="font-semibold mb-2">Service Notes</h2>
+          <h2 className="text-xl font-semibold mb-2">Service Notes</h2>
           {/* Edit icon for service notes */}
           {report.draft && (
             <div className="absolute top-4 right-4 z-10">
@@ -231,37 +221,41 @@ const ServiceReportViewPage = () => {
                 >
                   <div className="font-semibold text-muted-foreground mb-2">
                     {note.date && "toDate" in note.date
-                      ? note.date.toDate().toLocaleDateString()
+                      ? note.date.toDate().toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })
                       : ""}
                   </div>
                   <div className="space-y-4">
                     <div>
                       <div className="font-semibold">Technician Time</div>
-                      <div>{note.technicianTime}</div>
+                      <div>{note.technicianTime} hr</div>
                     </div>
                     <div>
                       <div className="font-semibold">Technician OT</div>
-                      <div>{note.technicianOvertime}</div>
+                      <div>{note.technicianOvertime} hr</div>
                     </div>
                     <div>
                       <div className="font-semibold">Helper Time</div>
-                      <div>{note.helperTime}</div>
+                      <div>{note.helperTime} hr</div>
                     </div>
                     <div>
                       <div className="font-semibold">Helper OT</div>
-                      <div>{note.helperOvertime}</div>
+                      <div>{note.helperOvertime} hr</div>
                     </div>
                     <div>
                       <div className="font-semibold">Remote Work</div>
                       <div>
                         {note.remoteWork || (
-                          <span className="text-muted-foreground">None</span>
+                          <span className="text-muted-foreground">N/A</span>
                         )}
                       </div>
                     </div>
                     <div>
                       <div className="font-semibold">Notes</div>
-                      <div>{note.serviceNotes}</div>
+                      {note.serviceNotes || <span className="text-muted-foreground">None</span>}
                     </div>
                   </div>
                 </div>

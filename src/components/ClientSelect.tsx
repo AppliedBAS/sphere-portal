@@ -99,12 +99,12 @@ export default function ClientSelect({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         {/* Use a button for left-aligned trigger text */}
-        <Button variant="outline" className="w-full md:max-w-96 justify-between">
+        <Button variant="outline" className="w-full md:max-w-96 justify-between md:text-sm">
           {selectedClient ? selectedClient.clientName : "Select client..."}
           <ChevronsUpDown className="opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0">
+      <PopoverContent className="w-96 p-0">
         <Command>
           <CommandInput
             placeholder="Type to search clients..."
