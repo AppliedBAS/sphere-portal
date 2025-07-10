@@ -56,6 +56,7 @@ const ServiceReportViewPage = () => {
       
       setLoading(false);
     }
+
     fetchReport();
   }, [id]);
 

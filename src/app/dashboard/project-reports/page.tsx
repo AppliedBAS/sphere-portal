@@ -25,6 +25,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 
 export default function ProjectReports() {
   const [reports, setReports] = useState<ProjectReport[]>([]);
@@ -148,7 +149,21 @@ export default function ProjectReports() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Project Reports</h1>
+      {/* Breadcrumb */}
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link href="/dashboard">Dashboard</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>Project Reports</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+      <h1 className="text-3xl font-bold">Project Reports</h1>
 
       {/* Search Input */}
       <div className="flex items-center gap-2">
