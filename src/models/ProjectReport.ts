@@ -1,7 +1,7 @@
 import { DocumentData, DocumentReference, FirestoreDataConverter, Timestamp } from "firebase/firestore";
 
 export interface ProjectReport {
-  id: string;
+  id: string | null;
   docId: number;
   projectDocId: number;
   clientName: string;
@@ -12,8 +12,8 @@ export interface ProjectReport {
   draft: boolean;
   createdAt: Timestamp;
   authorTechnicianRef: DocumentReference;
-  leadTechnicianRef?: DocumentReference;
-  assignedTechniciansRef?: DocumentReference[];
+  leadTechnicianRef: DocumentReference | null;
+  assignedTechniciansRef: DocumentReference[] | null;
 }
 
 export interface ProjectReportMessage {
@@ -65,7 +65,7 @@ export const projectReportConverter: FirestoreDataConverter<ProjectReport> = {
     fromFirestore: (snapshot: DocumentData): ProjectReport => {
         const data: DocumentData = snapshot.data();
         return {
-            id: data.id,
+            id: snapshot.id,
             docId: data["doc-id"],
             projectDocId: data["project-doc-id"],
             clientName: data["client-name"],

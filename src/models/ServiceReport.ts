@@ -19,7 +19,7 @@ export interface ServiceReport {
     serviceAddress1: string;
     serviceAddress2: string | null;
     serviceNotes: ServiceNote[];
-    warranty?: boolean; // Optional field for warranty status
+    warranty: boolean | null; // Optional field for warranty status
 }
 
 export const serviceReportConverter: FirestoreDataConverter<ServiceReport> = {

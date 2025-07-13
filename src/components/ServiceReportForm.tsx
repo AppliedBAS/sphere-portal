@@ -103,6 +103,8 @@ export default function ServiceReportForm({
   const [isWarranty, setIsWarranty] = useState<boolean>(
     serviceReport?.warranty || false
   );
+  const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
+  const [submittedReportId, setSubmittedReportId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isPreviewing, setIsPreviewing] = useState<boolean>(false);
@@ -185,6 +187,7 @@ export default function ServiceReportForm({
         setPurchaseOrders(orders);
       } catch (err) {
         setPurchaseOrders([]);
+        console.error("Error fetching purchase orders:", err);
       } finally {
         setLoadingPOs(false);
       }
@@ -572,8 +575,6 @@ export default function ServiceReportForm({
 
         await setDoc(serviceReportRef, serviceReportData);
       }
-
-      setIsNewReport(false);
       toast.success(
         <span className="text-lg md:text-sm">Draft saved successfully!</span>
       );
@@ -869,7 +870,9 @@ export default function ServiceReportForm({
         </span>
       );
       // Optionally, redirect to the report view page
-      window.location.href = `/dashboard/service-reports/${id}`;
+      setSubmittedReportId(id);
+      setSubmitDialogOpen(true);
+ 
     } catch {
       toast.error(
         <span className="text-lg md:text-sm">
@@ -1125,6 +1128,24 @@ export default function ServiceReportForm({
               onClick={() => setRephraseDialogOpen(false)}
             >
               Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Submit Success Dialog */}
+      <Dialog open={submitDialogOpen} onOpenChange={setSubmitDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Report Submitted</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">Your service report was submitted successfully.</div>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                window.location.href = `/dashboard/service-reports/${submittedReportId}`;
+              }}
+            >
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1455,12 +1476,11 @@ export default function ServiceReportForm({
               onCheckedChange={setLinkPurchaseOrders}
             />
             <p className="text-base sm:text-sm">{linkPurchaseOrders ? "On" : "Off"}</p>
+            {loadingPOs && <Loader2 className="animate-spin h-4 w-4 ml-2 text-muted-foreground" />}
           </div>
-          {linkPurchaseOrders && (
+          {linkPurchaseOrders && !loadingPOs && (
             <div className="mt-2 border rounded-lg p-4 bg-muted/30">
-              {loadingPOs ? (
-                <div className="flex items-center"><Loader2 className="animate-spin mr-2" />Loading purchase orders...</div>
-              ) : purchaseOrders.length === 0 ? (
+              { purchaseOrders.length === 0 ? (
                 <div className="text-muted-foreground text-sm">No purchase orders found for this report.</div>
               ) : (
                 <div className="space-y-4">
@@ -1754,7 +1774,7 @@ export default function ServiceReportForm({
                 disabled={isSubmitting || !client || !building || isSaving || isPreviewing}
                 variant="default"
               >
-                {isSubmitting ? "Submitting..." : "Submit Report"}
+                {isSubmitting ? "Submitting..." : "Submit"}
               </Button>
               {(isSubmitting || isSaving || isPreviewing) && (
                 <div className="my-auto">
