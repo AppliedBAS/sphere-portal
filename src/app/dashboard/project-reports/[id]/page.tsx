@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { firestore } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
-import type { ProjectReport } from "@/models/ProjectReport";
+import { projectReportConverter, type ProjectReport } from "@/models/ProjectReport";
 import { employeeConverter, Employee } from "@/models/Employee";
 import {
   Breadcrumb,
@@ -32,41 +32,26 @@ const ProjectReportPage = () => {
     async function fetchReport() {
       if (!idParam) return;
       setLoading(true);
-      const docRef = doc(firestore, "project reports", idParam);
+      const docRef = doc(firestore, "project reports", idParam).withConverter(projectReportConverter);
       const snap = await getDoc(docRef);
       if (snap.exists()) {
-        const data = snap.data() as any;
-        const pr: ProjectReport = {
-          id: snap.id,
-          docId: data["doc-id"],
-          projectDocId: data["project-doc-id"],
-          clientName: data["client-name"],
-          location: data["location"],
-          description: data["description"],
-          notes: data["notes"],
-          materials: data["materials"],
-          draft: data["draft"],
-          createdAt: data["created-at"],
-          authorTechnicianRef: data["author-technician-ref"],
-          leadTechnicianRef: data["lead-technician-ref"],
-          assignedTechniciansRef: data["assigned-technicians-ref"],
-        };
-        setReport(pr);
+        const data = snap.data() as ProjectReport;
+        setReport(data);
 
         // Fetch author technician
-        const authorSnap = await getDoc(pr.authorTechnicianRef.withConverter(employeeConverter));
+        const authorSnap = await getDoc(data.authorTechnicianRef.withConverter(employeeConverter));
         setAuthorTechnician(authorSnap.exists() ? authorSnap.data() : null);
 
         // Fetch lead technician
-        if (pr.leadTechnicianRef) {
-          const leadSnap = await getDoc(pr.leadTechnicianRef.withConverter(employeeConverter));
+        if (data.leadTechnicianRef) {
+          const leadSnap = await getDoc(data.leadTechnicianRef.withConverter(employeeConverter));
           setLeadTechnician(leadSnap.exists() ? leadSnap.data() : null);
         }
 
         // Fetch assigned technicians
-        if (pr.assignedTechniciansRef && pr.assignedTechniciansRef.length > 0) {
+        if (data.assignedTechniciansRef && data.assignedTechniciansRef.length > 0) {
           const snaps = await Promise.all(
-            pr.assignedTechniciansRef.map((ref) =>
+            data.assignedTechniciansRef.map((ref) =>
               getDoc(ref.withConverter(employeeConverter))
             )
           );

@@ -308,10 +308,13 @@ export default function ProjectReportForm({
 
         window.location.href = `/dashboard/project-reports/${docRef.id}/edit`;
       } else {
+        if (!projectReport?.id) {
+          throw new Error("Project report ID is missing for update.");
+        }
         const docRef = doc(
           firestore,
           "project reports",
-          projectReport?.id || ""
+          projectReport.id
         ).withConverter(projectReportConverter);
 
         const updatedReport: ProjectReport = {
@@ -393,13 +396,16 @@ export default function ProjectReportForm({
         newReportId = ref.id;
         setIsNewReport(false);
       } else {
+        if (!projectReport?.id) {
+          throw new Error("Project report ID is missing for update.");
+        }
         const reportRef = doc(
           firestore,
           "project reports",
-          projectReport!.id
+          projectReport.id
         ).withConverter(projectReportConverter);
 
-        newReportId = projectReport!.id;
+        newReportId = projectReport.id;
 
         const newProjectReport: ProjectReport = {
           assignedTechniciansRef: assignedTechnicians.map((e) =>
@@ -420,17 +426,13 @@ export default function ProjectReportForm({
             ? doc(firestore, "employees", leadEmployee.id)
             : null,
           location: project.location,
-          materials: combineMaterials(
-            additionalMaterials,
-            purchaseOrders,
-            linkPurchaseOrders
-          ),
+          materials: additionalMaterials || "None",
           notes: notes,
           projectDocId: project.docId,
         };
         await setDoc(reportRef, newProjectReport!);
-
       }
+
       const data: ProjectReportMessage = {
         project_id: project.docId,
         doc_id: currentDoc,
@@ -451,30 +453,25 @@ export default function ProjectReportForm({
       };
 
       // Send report to API (v2)
-      try {
-        const currentEmployee = await getEmployeeByEmail(user.email!);
-        const token = btoa(
-          `${currentEmployee.clientId}:${currentEmployee.clientSecret}`
-        );
-        const authorizationHeader = `Bearer ${token}`;
-        const res = await fetch("https://api.appliedbas.com/v2/mail/pr", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: authorizationHeader,
-          },
-          body: JSON.stringify(data),
-        });
-        const result = await res.json();
-        if (!res.ok) throw new Error(result.message || "Error sending report");
-        toast.success("Report submitted successfully!");
+      const currentEmployee = await getEmployeeByEmail(user.email!);
+      const token = btoa(
+        `${currentEmployee.clientId}:${currentEmployee.clientSecret}`
+      );
+      const authorizationHeader = `Bearer ${token}`;
+      const res = await fetch("https://api.appliedbas.com/v2/mail/pr", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: authorizationHeader,
+        },
+        body: JSON.stringify(data),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.message || "Error sending report");
+      toast.success("Report submitted successfully!");
 
-        setSubmittedReportId(newReportId);
-        setSubmitDialogOpen(true);
-      } catch (error) {
-        console.error("Error sending report:", error);
-        toast.error("Error sending report");
-      }
+      setSubmittedReportId(newReportId);
+      setSubmitDialogOpen(true);
     } catch (error) {
       console.error("Error submitting report:", error);
       toast.error("Error submitting report");
@@ -489,7 +486,7 @@ export default function ProjectReportForm({
     setRephraseDialogOpen(true);
     try {
       const response = await openAIClient.responses.create({
-        model: "gpt-4",
+        model: "gpt-4.1-mini",
         instructions:
           "Rephrase the project report notes for clarity and professionalism.",
         input: notes,

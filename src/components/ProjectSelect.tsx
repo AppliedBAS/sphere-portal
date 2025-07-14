@@ -19,6 +19,7 @@ import { ChevronsUpDown } from "lucide-react";
 import { algoliasearch } from "algoliasearch";
 import { debounce } from "lodash";
 import { ProjectHit } from "@/models/Project";
+import { Hit } from "algoliasearch/lite";
 
 interface ProjectSelectProps {
   selectedProject: ProjectHit | null;
@@ -63,12 +64,12 @@ export default function ProjectSelect({
           });
           setHits(
             hits
-              .map((hit: any) => ({
-                objectID: hit["objectID"],
-                docId: hit["doc-id"],
-                client: hit.client,
-                description: hit.description,
-                location: hit.location,
+              .map((hit: Hit) => ({
+                objectID: String(hit["objectID"]),
+                docId: Number(hit["doc-id"]),
+                client: String(hit.client),
+                description: String(hit.description),
+                location: String(hit.location),
               }))
               .sort((a, b) => (b.docId ?? 0) - (a.docId ?? 0))
           );
