@@ -66,6 +66,7 @@ import {
   ServiceReportMessage,
 } from "@/models/ServiceReport";
 import { getEmployeeByEmail } from "@/services/employeeService";
+import { PurchaseOrder, purchaseOrderConverter } from "@/models/PurchaseOrder";
 
 interface ServiceReportFormProps {
   serviceReport?: ServiceReport;
@@ -102,7 +103,11 @@ export default function ServiceReportForm({
   const [isWarranty, setIsWarranty] = useState<boolean>(
     serviceReport?.warranty || false
   );
-  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
+  const [submittedReportId, setSubmittedReportId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isPreviewing, setIsPreviewing] = useState<boolean>(false);
 
   const [authorTechnician, setAuthorTechnician] = useState<Employee | null>(
     null
@@ -157,6 +162,38 @@ export default function ServiceReportForm({
       },
     ]
   );
+
+  const [linkPurchaseOrders, setLinkPurchaseOrders] = useState(false);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [loadingPOs, setLoadingPOs] = useState(false);
+
+  useEffect(() => {
+    async function fetchPurchaseOrders() {
+      if (!docId) return;
+      setLoadingPOs(true);
+      try {
+        const q = query(
+          collection(firestore, "orders").withConverter(purchaseOrderConverter),
+          where("service-report-doc-id", "==", docId)
+        );
+        const querySnapshot = await getDocs(q);
+        const orders: PurchaseOrder[] = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data) {
+            orders.push(data);
+          }
+        });
+        setPurchaseOrders(orders);
+      } catch (err) {
+        setPurchaseOrders([]);
+        console.error("Error fetching purchase orders:", err);
+      } finally {
+        setLoadingPOs(false);
+      }
+    }
+    if (linkPurchaseOrders) fetchPurchaseOrders();
+  }, [linkPurchaseOrders, docId]);
 
   useEffect(() => {
     if (firebaseUser) {
@@ -338,7 +375,7 @@ export default function ServiceReportForm({
       return;
     }
 
-    setSubmitting(true);
+    setIsSubmitting(true);
     setIsRephrasing(true);
     try {
       setCurrentRephraseIndex(index);
@@ -350,11 +387,11 @@ export default function ServiceReportForm({
             No service note text to rephrase.
           </span>
         );
-        setSubmitting(false);
+        setIsSubmitting(false);
         return;
       }
       const response = await openAIClient.responses.create({
-        model: "gpt-4",
+        model: "gpt-4.1-mini",
         instructions:
           "Rephrase the service note for clarity and professionalism.",
         input: noteToRephrase,
@@ -369,7 +406,7 @@ export default function ServiceReportForm({
         </span>
       );
     } finally {
-      setSubmitting(false);
+      setIsSubmitting(false);
       setIsRephrasing(false);
     }
   };
@@ -395,7 +432,8 @@ export default function ServiceReportForm({
   };
 
   const handleSaveDraft = async () => {
-    setSubmitting(true);
+    setIsSaving(true);
+    setIsSubmitting(true);
 
     if (!user) {
       return;
@@ -407,7 +445,7 @@ export default function ServiceReportForm({
           Error loading author technician. Please try again later.
         </span>
       );
-      setSubmitting(false);
+      setIsSubmitting(false);
       return;
     }
 
@@ -417,7 +455,7 @@ export default function ServiceReportForm({
           Please select a client before saving the draft.
         </span>
       );
-      setSubmitting(false);
+      setIsSubmitting(false);
       return;
     }
 
@@ -427,7 +465,7 @@ export default function ServiceReportForm({
           Please select a building before saving the draft.
         </span>
       );
-      setSubmitting(false);
+      setIsSubmitting(false);
       return;
     }
 
@@ -437,7 +475,7 @@ export default function ServiceReportForm({
           Please add at least one service note before saving the draft.
         </span>
       );
-      setSubmitting(false);
+      setIsSubmitting(false);
       return;
     }
 
@@ -537,10 +575,6 @@ export default function ServiceReportForm({
 
         await setDoc(serviceReportRef, serviceReportData);
       }
-
-      setIsNewReport(false);
-      setSubmitting(false);
-
       toast.success(
         <span className="text-lg md:text-sm">Draft saved successfully!</span>
       );
@@ -551,6 +585,9 @@ export default function ServiceReportForm({
           Failed to save draft. Please try again.
         </span>
       );
+    } finally {
+      setIsSaving(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -617,9 +654,27 @@ export default function ServiceReportForm({
     }
   };
 
+  // Helper to combine additional materials with PO materials for preview/submit
+  function getCombinedMaterials() {
+    let combined = materialNotes?.trim() || "";
+    if (linkPurchaseOrders && purchaseOrders.length > 0) {
+      const poMaterials = purchaseOrders
+        .map((po) =>
+          po.description
+        ? `PO ${po.docId} - ${po.description}`
+        : `PO ${po.docId}`
+        )
+        .join("\n");
+      if (poMaterials) {
+        combined = combined ? `${combined}; ${poMaterials}` : poMaterials;
+      }
+    }
+    return combined && combined.trim() !== "" ? combined : "None";
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
+    setIsSubmitting(true);
 
     if (contactChanged) {
       toast.error(
@@ -627,7 +682,7 @@ export default function ServiceReportForm({
           Please save the contact information changes before submitting.
         </span>
       );
-      setSubmitting(false);
+      setIsSubmitting(false);
       return;
     }
 
@@ -637,7 +692,7 @@ export default function ServiceReportForm({
           You must be logged in to submit a service report.
         </span>
       );
-      setSubmitting(false);
+      setIsSubmitting(false);
       return;
     }
 
@@ -647,7 +702,7 @@ export default function ServiceReportForm({
           Error loading author technician. Try again later.
         </span>
       );
-      setSubmitting(false);
+      setIsSubmitting(false);
       return;
     }
 
@@ -657,7 +712,7 @@ export default function ServiceReportForm({
           Client and building must be selected before sending.
         </span>
       );
-      setSubmitting(false);
+      setIsSubmitting(false);
       return;
     }
 
@@ -779,7 +834,7 @@ export default function ServiceReportForm({
         (sum, n) => sum + parseFloat(n.helperOvertime),
         0
       ),
-      materials: materialNotes,
+      materials: getCombinedMaterials(),
       notes: serviceNotesInputs.map((n) => ({
         date: formatDate(n.date as Date),
         t_time: parseFloat(n.technicianTime),
@@ -815,7 +870,9 @@ export default function ServiceReportForm({
         </span>
       );
       // Optionally, redirect to the report view page
-      window.location.href = `/dashboard/service-reports/${id}`;
+      setSubmittedReportId(id);
+      setSubmitDialogOpen(true);
+ 
     } catch {
       toast.error(
         <span className="text-lg md:text-sm">
@@ -823,7 +880,7 @@ export default function ServiceReportForm({
         </span>
       );
     } finally {
-      setSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -901,6 +958,7 @@ export default function ServiceReportForm({
 
   // Generate PDF preview via API
   const handleGeneratePDF = async () => {
+    setIsPreviewing(true);
     if (!user) {
       toast.error(
         <span className="text-lg md:text-sm">
@@ -925,7 +983,6 @@ export default function ServiceReportForm({
       );
       return;
     }
-    setSubmitting(true);
     try {
       const currentEmployee: Employee = await getEmployeeByEmail(user.email!);
       // create base64 encoded bearer token
@@ -973,7 +1030,7 @@ export default function ServiceReportForm({
           (sum, n) => sum + parseFloat(n.helperOvertime),
           0
         ),
-        materials: materialNotes,
+        materials: getCombinedMaterials(),
         notes: serviceNotesInputs.map((n) => ({
           date: formatDate(n.date as Date),
           t_time: parseFloat(n.technicianTime),
@@ -1016,7 +1073,7 @@ export default function ServiceReportForm({
         </span>
       );
     } finally {
-      setSubmitting(false);
+      setIsPreviewing(false);
     }
   };
 
@@ -1045,7 +1102,7 @@ export default function ServiceReportForm({
       <Dialog open={rephraseDialogOpen} onOpenChange={setRephraseDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>AI Rephrase</DialogTitle>
+            <DialogTitle>Rephrase</DialogTitle>
           </DialogHeader>
           {isRephrasing ? (
             <div className="flex items-center justify-center">
@@ -1075,6 +1132,24 @@ export default function ServiceReportForm({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Submit Success Dialog */}
+      <Dialog open={submitDialogOpen} onOpenChange={setSubmitDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Report Submitted</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">Your service report was submitted successfully.</div>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                window.location.href = `/dashboard/service-reports/${submittedReportId}`;
+              }}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <form onSubmit={handleSubmit}>
         <div className="mt-4 flex flex-col gap-6">
@@ -1084,7 +1159,7 @@ export default function ServiceReportForm({
               <Label htmlFor="docId" className="text-lg md:text-sm">
                 Report No.
               </Label>
-              <Input id="docId" type="text" value={docId.toString()} />
+              <Input id="docId" type="text" value={docId.toString()} readOnly />
             </div>
           )}
           {/* === Assigned Technician === */}
@@ -1391,6 +1466,35 @@ export default function ServiceReportForm({
           <p className="text-base sm:text-sm text-muted-foreground">
             If enabled, this will send the email to our system internally.
           </p>
+
+          {/* === Purchase Orders Switch === */}
+          <div className="flex items-center space-x-2 mt-2">
+            <Label htmlFor="linkPurchaseOrdersSwitch">Link Purchase Orders</Label>
+            <Switch
+              id="linkPurchaseOrdersSwitch"
+              checked={linkPurchaseOrders}
+              onCheckedChange={setLinkPurchaseOrders}
+            />
+            <p className="text-base sm:text-sm">{linkPurchaseOrders ? "On" : "Off"}</p>
+            {loadingPOs && <Loader2 className="animate-spin h-4 w-4 ml-2 text-muted-foreground" />}
+          </div>
+          {linkPurchaseOrders && !loadingPOs && (
+            <div className="mt-2 border rounded-lg p-4 bg-muted/30">
+              { purchaseOrders.length === 0 ? (
+                <div className="text-muted-foreground text-sm">No purchase orders found for this report.</div>
+              ) : (
+                <div className="space-y-4">
+                  {purchaseOrders.map((po) => (
+                    <div key={po.id} className="flex flex-col space-y-1">
+                      <div className="sm:text-sm text-base">PO {po.docId} - {po.description}</div>
+                      {/* If you want to show more PO fields, add them here as readOnly or plain text */}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* === Material Notes === */}
           <div className="flex flex-col space-y-2">
             <Label htmlFor="materialNotes">Additional Materials</Label>
@@ -1652,27 +1756,27 @@ export default function ServiceReportForm({
               <Button
                 type="button"
                 variant="outline"
-                disabled={submitting || !client || !building}
+                disabled={isSubmitting || !client || !building || isSaving || isPreviewing}
                 onClick={handleGeneratePDF}
               >
-                Preview
+                {isPreviewing ? "Previewing..." : "Preview"}
               </Button>
               <Button
                 type="button"
-                disabled={submitting || !client || !building}
+                disabled={isSubmitting || !client || !building || isSaving || isPreviewing}
                 variant="outline"
                 onClick={handleSaveDraft}
               >
-                Save
+                {isSaving ? "Saving..." : "Save"}
               </Button>
               <Button
                 type="submit"
-                disabled={submitting || !client || !building}
+                disabled={isSubmitting || !client || !building || isSaving || isPreviewing}
                 variant="default"
               >
-                Submit
+                {isSubmitting ? "Submitting..." : "Submit"}
               </Button>
-              {submitting && (
+              {(isSubmitting || isSaving || isPreviewing) && (
                 <div className="my-auto">
                   <Loader2 className="animate-spin text-muted-foreground" />
                 </div>
