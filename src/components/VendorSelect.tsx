@@ -18,23 +18,23 @@ import { Button } from "@/components/ui/button";
 import { ChevronsUpDown } from "lucide-react";
 import { algoliasearch } from "algoliasearch";
 import { debounce } from "lodash";
-import { ProjectHit } from "@/models/Project";
+import { VendorHit } from "@/models/Vendor";
 import { Hit } from "algoliasearch/lite";
 
-interface ProjectSelectProps {
-  selectedProject: ProjectHit | null;
-  setSelectedProject: (proj: ProjectHit | null) => void;
+interface VendorSelectProps {
+  selectedVendor: VendorHit | null;
+  setSelectedVendor: (vendor: VendorHit | null) => void;
   placeholder?: string;
 }
 
-export default function ProjectSelect({
-  selectedProject,
-  setSelectedProject,
-  placeholder = "Select project...",
-}: ProjectSelectProps) {
+export default function VendorSelect({
+  selectedVendor,
+  setSelectedVendor,
+  placeholder = "Select vendor...",
+}: VendorSelectProps) {
   const [open, setOpen] = useState(false);
   const [queryText, setQueryText] = useState("");
-  const [hits, setHits] = useState<ProjectHit[]>([]);
+  const [hits, setHits] = useState<VendorHit[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Memoize Algolia client
@@ -59,19 +59,17 @@ export default function ProjectSelect({
 
         try {
           const { hits } = await client.searchSingleIndex({
-            indexName: "projects",
+            indexName: "vendors",
             searchParams: { query: q, hitsPerPage: 10 },
           });
           setHits(
-            hits
-              .map((hit: Hit) => ({
-                objectID: String(hit.objectID),
-                docId: Number(hit["doc-id"]),
-                client: String(hit.client),
-                description: String(hit.description),
-                location: String(hit.location),
-              }))
-              .sort((a, b) => (b.docId ?? 0) - (a.docId ?? 0))
+            hits.map((hit: Hit) => ({
+              objectID: String(hit.objectID),
+              name: String(hit.name),
+              active: Boolean(hit.active),
+              id: String(hit.id),
+            })) 
+            .sort((a, b) => a.name.localeCompare(b.name)) as VendorHit[]
           );
         } catch (error) {
           console.error("Algolia search error:", error);
@@ -98,12 +96,10 @@ export default function ProjectSelect({
         <Button
           variant="outline"
           className="w-full md:max-w-96 justify-between overflow-hidden text-ellipsis whitespace-nowrap"
-          style={{ display: 'flex', alignItems: 'center' }}
+          style={{ display: "flex", alignItems: "center" }}
         >
           <span className="truncate block text-left">
-            {selectedProject
-              ? `${selectedProject.docId} - ${selectedProject.client} - ${selectedProject.location} - ${selectedProject.description}`
-              : placeholder}
+            {selectedVendor ? selectedVendor.name : placeholder}
           </span>
           <ChevronsUpDown className="opacity-50 flex-shrink-0 ml-2" />
         </Button>
@@ -111,34 +107,34 @@ export default function ProjectSelect({
       <PopoverContent className="w-96 p-0 max-h-60 overflow-y-auto">
         <Command>
           <CommandInput
-            placeholder="Search projects..."
+            placeholder="Search vendors..."
             value={queryText}
             onValueChange={(val) => setQueryText(val)}
           />
           <CommandList>
             {loading && <div className="p-4 text-center">Loading...</div>}
             {!loading && hits.length === 0 && (
-              <CommandEmpty>No projects found.</CommandEmpty>
+              <CommandEmpty>No vendors found.</CommandEmpty>
             )}
             {!loading && hits.length > 0 && (
               <CommandGroup>
-                {hits.map((proj) => (
+                {hits.map((vendor) => (
                   <CommandItem
-                    key={proj.objectID}
+                    key={vendor.objectID}
                     onSelect={() => {
-                      setSelectedProject(proj);
+                      setSelectedVendor(vendor);
                       setOpen(false);
                       setQueryText("");
                     }}
                   >
-                    {`${proj.docId} - ${proj.client} - ${proj.location} - ${proj.description}`}
+                    {vendor.name}
                   </CommandItem>
                 ))}
               </CommandGroup>
             )}
             <CommandItem
               onSelect={() => {
-                setSelectedProject(null);
+                setSelectedVendor(null);
                 setOpen(false);
                 setQueryText("");
               }}

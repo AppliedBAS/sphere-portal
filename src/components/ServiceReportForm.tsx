@@ -126,6 +126,7 @@ export default function ServiceReportForm({
   const [materialNotes, setMaterialNotes] = useState<string>(
     serviceReport?.materialNotes || ""
   );
+  
   const [emails, setEmails] = useState<string[]>([]);
   // Add state for dialog and new building form
   const [addBuildingOpen, setAddBuildingOpen] = useState(false);

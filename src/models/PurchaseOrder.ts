@@ -6,12 +6,27 @@ export interface PurchaseOrder {
     description: string;
     docId: number;
     id: string;
-    otherCategory?: string;
-    projectDocId?: number;
-    serviceReportDocId?: number;
+    otherCategory: string | null;
+    projectDocId: number | null;
+    serviceReportDocId: number | null;
     status: string;
     technicianRef: DocumentReference;
     vendor: string;
+}
+
+export interface PurchaseOrderMessage {
+    technician_name: string;
+    technician_phone: string;
+    technician_email: string;
+    materials: string;
+    purchase_order_num: number;
+    project_info: string | null;
+    service_report_info: string | null;
+    other: string | null;
+    vendor: string;
+    amount: number;
+    attachment_content: string[];
+    attachment_name: string[];
 }
 
 export const purchaseOrderConverter: FirestoreDataConverter<PurchaseOrder> = {

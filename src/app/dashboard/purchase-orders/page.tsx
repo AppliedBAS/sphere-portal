@@ -140,6 +140,7 @@ export default function PurchaseOrders() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
+      
       <h1 className="text-3xl font-bold">Purchase Orders</h1>
 
       {/* Search Input */}
