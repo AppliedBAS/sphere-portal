@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Popover,
   PopoverTrigger,
@@ -37,7 +37,7 @@ export default function VendorSelect({
   const [hits, setHits] = useState<VendorHit[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Memoize Algolia client
+  // Algolia client
   const client = useMemo(
     () =>
       algoliasearch(
@@ -47,75 +47,81 @@ export default function VendorSelect({
     []
   );
 
+  // Single helper to fetch hits for any query, including empty string
+  const fetchHits = useCallback(async (q: string) => {
+    setLoading(true);
+    try {
+      const { hits: rawHits } = await client.searchSingleIndex({
+        indexName: "vendors",
+        searchParams: { query: q.trim(), hitsPerPage: 10 },
+      });
+      const mapped = rawHits
+        .map((hit: Hit) => ({
+          objectID: String(hit.objectID),
+          name: String(hit.name),
+          active: Boolean(hit.active),
+          id: String(hit.id),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name)) as VendorHit[];
+
+      setHits(mapped);
+    } catch (err) {
+      console.error("Algolia search error:", err);
+      setHits([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [client]);
+
+  // Debounced version for when user is typing
   const debouncedSearch = useMemo(
-    () =>
-      debounce(async (q: string) => {
-        if (!q.trim()) {
-          setHits([]);
-          return;
-        }
-
-        setLoading(true);
-
-        try {
-          const { hits } = await client.searchSingleIndex({
-            indexName: "vendors",
-            searchParams: { query: q, hitsPerPage: 10 },
-          });
-          setHits(
-            hits.map((hit: Hit) => ({
-              objectID: String(hit.objectID),
-              name: String(hit.name),
-              active: Boolean(hit.active),
-              id: String(hit.id),
-            })) 
-            .sort((a, b) => a.name.localeCompare(b.name)) as VendorHit[]
-          );
-        } catch (error) {
-          console.error("Algolia search error:", error);
-        } finally {
-          setLoading(false);
-        }
-      }, 300),
-    [client]
+    () => debounce((q: string) => fetchHits(q), 300),
+    [fetchHits]
   );
 
-  useEffect(() => {
-    return () => {
-      debouncedSearch.cancel();
-    };
-  }, [debouncedSearch]);
-
+  // When queryText changes, trigger the debounced search
   useEffect(() => {
     debouncedSearch(queryText);
+    return () => debouncedSearch.cancel();
   }, [queryText, debouncedSearch]);
+
+  // When popover opens, do an initial fetch with empty query
+  useEffect(() => {
+    if (open) {
+      fetchHits("");
+    }
+  }, [open, fetchHits]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
+          role="combobox"
+          aria-expanded={open}
           className="w-full md:max-w-96 justify-between overflow-hidden text-ellipsis whitespace-nowrap"
-          style={{ display: "flex", alignItems: "center" }}
         >
-          <span className="truncate block text-left">
+          <span className="truncate text-left">
             {selectedVendor ? selectedVendor.name : placeholder}
           </span>
           <ChevronsUpDown className="opacity-50 flex-shrink-0 ml-2" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-96 p-0 max-h-60 overflow-y-auto">
+
+      <PopoverContent className="w-96 p-0">
         <Command>
           <CommandInput
             placeholder="Search vendors..."
             value={queryText}
-            onValueChange={(val) => setQueryText(val)}
+            onValueChange={setQueryText}
           />
-          <CommandList>
+          <CommandList className="max-h-60 overflow-y-auto">
             {loading && <div className="p-4 text-center">Loading...</div>}
+
             {!loading && hits.length === 0 && (
               <CommandEmpty>No vendors found.</CommandEmpty>
             )}
+
             {!loading && hits.length > 0 && (
               <CommandGroup>
                 {hits.map((vendor) => (
@@ -132,6 +138,7 @@ export default function VendorSelect({
                 ))}
               </CommandGroup>
             )}
+
             <CommandItem
               onSelect={() => {
                 setSelectedVendor(null);
@@ -139,7 +146,8 @@ export default function VendorSelect({
                 setQueryText("");
               }}
             >
-              Clear selection
+              <ChevronsUpDown className="mr-2 rotate-180" />
+              Clear Selection
             </CommandItem>
           </CommandList>
         </Command>

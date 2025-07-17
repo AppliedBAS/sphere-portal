@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { firestore } from "@/lib/firebase";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, Timestamp } from "firebase/firestore";
 import { purchaseOrderConverter, PurchaseOrder } from "@/models/PurchaseOrder";
 
 import {
@@ -106,7 +106,7 @@ export default function PurchaseOrders() {
   }, [sorted, pageIndex]);
 
   // Helper to format Firestore Timestamp
-  const formatDate = (ts: any) => ts?.toDate().toLocaleString();
+  const formatDate = (ts: Timestamp) => ts?.toDate().toLocaleString();
 
   const toggleSort = (
     column: "docId" | "vendor" | "description" | "status" | "createdAt"

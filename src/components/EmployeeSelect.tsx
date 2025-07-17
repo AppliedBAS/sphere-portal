@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Employee } from "@/models/Employee";
 import { useAuth } from "@/contexts/AuthContext";
+import { CommandList } from "cmdk";
 
 interface EmployeeSelectProps {
   employees: Employee[];
@@ -41,15 +42,17 @@ export default function EmployeeSelect({
   const [query, setQuery] = useState("");
   const { user } = useAuth();
 
-  // Only filter once employees arrive, excluding current user
+  // Only filter once employees arrive, excluding current user, and sort alphabetically by name
   const filtered = useMemo(() => {
     // Exclude the logged-in user by email
     const base = employees.filter((e) =>
       user?.email ? e.email !== user.email : true
     );
-    if (!query) return base;
+    // Sort alphabetically by name
+    const sorted = base.sort((a, b) => a.name.localeCompare(b.name));
+    if (!query) return sorted;
     const lower = query.toLowerCase();
-    return base.filter(
+    return sorted.filter(
       (e) =>
         e.name.toLowerCase().includes(lower) ||
         e.email.toLowerCase().includes(lower)
@@ -63,7 +66,7 @@ export default function EmployeeSelect({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="w-full md:max-w-96 justify-between md:text-sm"
+            className="w-full md:max-w-96 justify-between overflow-hidden text-ellipsis whitespace-nowrap"
             onClick={() => {
               // Refetch employees any time the popover opens if the list is empty
               if (!open && employees.length === 0) {
@@ -76,7 +79,7 @@ export default function EmployeeSelect({
           </Button>
         </PopoverTrigger>
 
-        <PopoverContent className="w-96 p-0 max-h-56 overflow-y-auto" align="start">
+        <PopoverContent className="w-96 p-0">
           <Command>
             <CommandInput
               placeholder="Search employees..."
@@ -84,7 +87,7 @@ export default function EmployeeSelect({
               onValueChange={(val) => setQuery(val)}
             />
 
-            <CommandGroup>
+            <CommandList className="max-h-60 overflow-y-auto">
               {loading && (
                 <CommandItem disabled>Loading employees…</CommandItem>
               )}
@@ -96,24 +99,22 @@ export default function EmployeeSelect({
               )}
 
               {!loading &&
-                !error &&
-                filtered.map((emp) => (
-                  <CommandItem
-                    key={emp.id}
-                    onSelect={() => {
-                      setSelectedEmployee(emp);
+                !error && filtered.length > 0 && (
+                <CommandGroup>
+                  {filtered.map((emp) => (
+                    <CommandItem
+                      key={emp.id}
+                      onSelect={() => {
+                        setSelectedEmployee(emp);
                       setOpen(false);
                       setQuery("");
                     }}
                   >
-                    <div className="flex flex-col">
-                      <span className="">{emp.name}</span>
-                      <span className="text-sm text-muted-foreground">
-                        {emp.email}
-                      </span>
-                    </div>
+                  {emp.name}
                   </CommandItem>
                 ))}
+                </CommandGroup>
+              )}
 
               <CommandItem
                 onSelect={() => {
@@ -125,7 +126,7 @@ export default function EmployeeSelect({
                 <ChevronsUpDown className="mr-2 rotate-180" />
                 Clear Selection
               </CommandItem>
-            </CommandGroup>
+            </CommandList>
           </Command>
         </PopoverContent>
       </Popover>
