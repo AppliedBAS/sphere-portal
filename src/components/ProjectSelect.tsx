@@ -50,11 +50,6 @@ export default function ProjectSelect({
   const debouncedSearch = useMemo(
     () =>
       debounce(async (q: string) => {
-        if (!q.trim()) {
-          setHits([]);
-          return;
-        }
-
         setLoading(true);
 
         try {
@@ -65,7 +60,7 @@ export default function ProjectSelect({
           setHits(
             hits
               .map((hit: Hit) => ({
-                objectID: String(hit["objectID"]),
+                objectID: String(hit.objectID),
                 docId: Number(hit["doc-id"]),
                 client: String(hit.client),
                 description: String(hit.description),
@@ -108,7 +103,7 @@ export default function ProjectSelect({
           <ChevronsUpDown className="opacity-50 flex-shrink-0 ml-2" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-96 p-0 max-h-60 overflow-y-auto">
+      <PopoverContent className="w-96 p-0 max-h-60">
         <Command>
           <CommandInput
             placeholder="Search projects..."
@@ -143,7 +138,8 @@ export default function ProjectSelect({
                 setQueryText("");
               }}
             >
-              Clear selection
+              <ChevronsUpDown className="mr-2 rotate-180" />
+              Clear Selection
             </CommandItem>
           </CommandList>
         </Command>

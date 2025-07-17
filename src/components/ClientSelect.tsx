@@ -47,10 +47,6 @@ export default function ClientSelect({
   const debouncedSearch = useMemo(
     () =>
       debounce(async (q: string) => {
-        if (!q.trim()) {
-          setHits([]);
-          return;
-        }
         setLoading(true);
         try {
           const { hits } = await client.searchSingleIndex({
@@ -99,7 +95,7 @@ export default function ClientSelect({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         {/* Use a button for left-aligned trigger text */}
-        <Button variant="outline" className="w-full md:max-w-96 justify-between md:text-sm">
+        <Button variant="outline" className="w-full md:max-w-96 justify-between overflow-hidden text-ellipsis whitespace-nowrap">
           {selectedClient ? selectedClient.clientName : "Select client..."}
           <ChevronsUpDown className="opacity-50" />
         </Button>

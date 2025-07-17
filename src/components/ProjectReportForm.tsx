@@ -573,6 +573,10 @@ export default function ProjectReportForm({
     }
   };
 
+  const handleCloseDialog = () => {
+    window.location.href = `/dashboard/project-reports/${submittedReportId!}`;
+  };
+
   return (
     <>
       {/* AI Rephrase Dialog */}
@@ -612,14 +616,12 @@ export default function ProjectReportForm({
       <Dialog open={submitDialogOpen} onOpenChange={setSubmitDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Report Submitted</DialogTitle>
+            <DialogTitle>{project!.docId} - {docId} Report Submitted</DialogTitle>
           </DialogHeader>
           <div className="py-4">Your project report was submitted successfully.</div>
           <DialogFooter>
             <Button
-              onClick={() => {
-                window.location.href = `/dashboard/project-reports/${submittedReportId}`;
-              }}
+              onClick={handleCloseDialog}
             >
               Close
             </Button>
