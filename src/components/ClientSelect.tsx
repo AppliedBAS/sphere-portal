@@ -79,6 +79,17 @@ export default function ClientSelect({
     [client]
   );
 
+  // Prevent background scroll when popover is open
+  useEffect(() => {
+    if (open) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [open]);
+
   // Clean up debounce on unmount
   useEffect(() => {
     return () => {

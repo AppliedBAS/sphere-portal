@@ -27,6 +27,7 @@ interface ProjectSelectProps {
   placeholder?: string;
 }
 
+
 export default function ProjectSelect({
   selectedProject,
   setSelectedProject,
@@ -76,6 +77,17 @@ export default function ProjectSelect({
       }, 300),
     [client]
   );
+
+  // Prevent background scroll when popover is open
+  useEffect(() => {
+    if (open) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [open]);
 
   useEffect(() => {
     return () => {
