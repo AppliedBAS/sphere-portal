@@ -613,21 +613,23 @@ export default function ProjectReportForm({
         </DialogContent>
       </Dialog>
       {/* Submit Success Dialog */}
-      <Dialog open={submitDialogOpen} onOpenChange={setSubmitDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{project!.docId} - {docId} Report Submitted</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">Your project report was submitted successfully.</div>
-          <DialogFooter>
-            <Button
-              onClick={handleCloseDialog}
-            >
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {project && (
+        <Dialog open={submitDialogOpen} onOpenChange={setSubmitDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{project.docId} - {docId} Report Submitted</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">Your project report was submitted successfully.</div>
+            <DialogFooter>
+              <Button
+                onClick={handleCloseDialog}
+              >
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
       <form onSubmit={handleSubmit}>
         <div className="mt-4 flex flex-col gap-6 mb-8">
           <div className="flex flex-col space-y-2">
@@ -638,7 +640,7 @@ export default function ProjectReportForm({
             />
           </div>
 
-          {docId !== null && docId !== 0 && (
+          {project && docId !== null && docId !== 0 && (
             <div className="flex flex-col space-y-2">
               <Label htmlFor="docId">Report No.</Label>
               <Input
@@ -688,7 +690,9 @@ export default function ProjectReportForm({
             </div>
 
             <EmployeeSelect
-              employees={technicians}
+              employees={technicians.filter(
+                (emp) => !assignedTechnicians.some((assigned) => assigned.id === emp.id)
+              )}
               loading={loadingEmployees}
               error={employeesError}
               refetch={refetchEmployees}

@@ -85,6 +85,17 @@ export default function VendorSelect({
     return () => debouncedSearch.cancel();
   }, [queryText, debouncedSearch]);
 
+  // Prevent background scroll when popover is open
+  useEffect(() => {
+    if (open) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [open]);
+
   // When popover opens, do an initial fetch with empty query
   useEffect(() => {
     if (open) {

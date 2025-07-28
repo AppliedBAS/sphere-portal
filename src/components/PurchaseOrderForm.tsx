@@ -123,7 +123,7 @@ export default function PurchaseOrderForm({
       setLoading(false);
     }
     initForm();
-  }, []);
+  }, [purchaseOrder]);
 
   // Only show the input for the selected category, set others to null
   useEffect(() => {

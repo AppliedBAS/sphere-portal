@@ -1,7 +1,7 @@
 // src/components/EmployeeSelect.tsx
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { ChevronsUpDown } from "lucide-react";
 import {
   Popover,
@@ -58,6 +58,17 @@ export default function EmployeeSelect({
         e.email.toLowerCase().includes(lower)
     );
   }, [employees, query, user?.email]);
+
+  // Prevent background scroll when popover is open
+  useEffect(() => {
+    if (open) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [open]);
 
   return (
       <Popover open={open} onOpenChange={setOpen}>

@@ -1711,7 +1711,7 @@ export default function ServiceReportForm({
           {/* Create list of inputs per contact email, buttons to remove and add contact emails */}
           <div className="mt-6">
             <Label>Email Contacts</Label>
-            <Label className="text-muted-foreground mt-2">
+            <Label className="text-muted-foreground mt-2 mb-4">
               <span className="text-card-foreground">
                 {assignedTechnician
                   ? assignedTechnician.email
@@ -1721,7 +1721,7 @@ export default function ServiceReportForm({
             </Label>
 
             {emails.map((email, idx) => (
-              <div key={idx} className="flex items-center gap-2 mt-2">
+              <div key={idx} className="flex items-center gap-4 mt-4">
                 <Input
                   type="email"
                   value={email}
@@ -1746,7 +1746,7 @@ export default function ServiceReportForm({
             <Button
               type="button"
               variant="secondary"
-              className="mt-2"
+              className="mt-4"
               onClick={handleAddEmail}
             >
               Add Email Contact
