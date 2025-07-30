@@ -73,7 +73,7 @@ export default function LoginPage() {
         </div>
         <Button
           onClick={login}
-          className="flex items-center justify-center gap-2 text-base shadow font-semibold w-full py-3"
+          className="flex items-center justify-center gap-2 text-base shadow font-semibold w-full py-3 bg-foreground text-white dark:text-black dark:hover:bg-gray-300 hover:bg-[#303030]"
         >
           <svg width="20" height="20" viewBox="0 0 23 23" fill="none">
             <rect x="1" y="1" width="9" height="9" fill="#F35325" />

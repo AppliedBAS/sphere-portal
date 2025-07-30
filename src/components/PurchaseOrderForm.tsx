@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { PurchaseOrder, purchaseOrderConverter, PurchaseOrderMessage } from "@/models/PurchaseOrder";
+import { Attachment, PurchaseOrder, purchaseOrderConverter, PurchaseOrderMessage } from "@/models/PurchaseOrder";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -28,6 +28,7 @@ import { ProjectReport } from "@/models/ProjectReport";
 import { fetchDraftProjectReports, fetchDraftServiceReports } from "@/services/reportService";
 import { Textarea } from "./ui/textarea";
 import ServiceReportSelect from "./ServiceReportSelect";
+import { FileSelectButton } from "./FileselectButton";
 
 interface PurchaseOrderFormProps {
   purchaseOrder: PurchaseOrder;
@@ -58,6 +59,7 @@ export default function PurchaseOrderForm({
   const [categoryType, setCategoryType] = useState<
     "other" | "project" | "service" | null
   >(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   const canSubmit: boolean = !!description && !!amount && !!vendor && (
     (categoryType === "project" && !!selectedProjectReport) ||
@@ -139,12 +141,28 @@ export default function PurchaseOrderForm({
     }
   }, [purchaseOrder, categoryType]);
 
-  // const handleFiles = (files: FileList | null) => {
-  //   if (!files) return;
-  //   Array.from(files).forEach((file) => {
-  //     console.log('Selected file:', file.name, file.size);
-  //   });
-  // };
+  const handleFiles = (files: FileList | null) => {
+    if (!files) return;
+    const allowedTypes = [
+      'image/jpeg', 'image/png', 'application/pdf', 'image/heic', 'image/heif',
+      'image/tiff', 'image/bmp', 'image/gif',
+    ];
+    const newFilesArr = Array.from(files);
+    const filteredFiles = newFilesArr.filter((file) => {
+      if (!allowedTypes.includes(file.type)) {
+        toast.error(`File type not allowed: ${file.name}`);
+        return false;
+      }
+      return true;
+    });
+    setSelectedFiles((prev) => {
+      const prevArr = prev || [];
+      const uniqueFiles = filteredFiles.filter(
+        (file) => !prevArr.some(f => f.name === file.name && f.size === file.size)
+      );
+      return [...prevArr, ...uniqueFiles];
+    });
+  };
 
   // Save as draft
   const handleSave = async () => {
@@ -192,10 +210,45 @@ export default function PurchaseOrderForm({
         `${currentEmployee.clientId}:${currentEmployee.clientSecret}`
       );
       const authorizationHeader = `Bearer ${token}`;
+      // Convert files to base64 for attachments (keep data: prefix)
+      const buildAttachments = async (files: File[]): Promise<Attachment[]> => {
+        const promises = files.map(
+          (file) =>
+            new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                const result = reader.result;
+                if (typeof result === "string") {
+                  // Remove the data:*;base64, prefix, leave only the base64 value
+                  const base64 = result.split(",")[1] ?? "";
+                  resolve(base64);
+                } else {
+                  reject(new Error("FileReader result is not a string"));
+                }
+              };
+              reader.onerror = (e) => reject(e);
+              reader.readAsDataURL(file);
+            })
+        );
+        const results = await Promise.allSettled(promises);
+        const attachments: Attachment[] = [];
+        results.forEach((result, idx) => {
+          if (result.status === "fulfilled") {
+            attachments.push({
+              type: files[idx].type,
+              content: result.value, // base64 only, no data: prefix
+            });
+          }
+        });
+        return attachments;
+      };
+
+      const attachments = selectedFiles.length > 0 ? await buildAttachments(selectedFiles) : [];
+
+      console.log("Attachments built:", attachments[0].content);
+
       const message: PurchaseOrderMessage = {
         amount: amount,
-        attachment_content: [],
-        attachment_name: [],
         materials: description,
         purchase_order_num: purchaseOrder.docId,
         project_info: selectedProjectReport
@@ -209,6 +262,7 @@ export default function PurchaseOrderForm({
         technician_name: technician ? technician.name : "",
         technician_phone: technician ? technician.phone : "",
         technician_email: technician ? technician.email : "",
+        attachments: attachments,
       };
 
       // check that only 1 of the 3 category fields is set
@@ -223,7 +277,7 @@ export default function PurchaseOrderForm({
         return;
       }
 
-      const res = await fetch("https://api.appliedbas.com/v1/mail/po", {
+      const res = await fetch("https://api.appliedbas.com/v2/mail/po", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -402,16 +456,38 @@ export default function PurchaseOrderForm({
             className="w-full min-h-[80px]"
           />
         </div>
-        {/* <div className="grid gap-2">
+        <div className="flex flex-col gap-2">
           <Label htmlFor="receipts">Receipts</Label>
-          <FileSelectButton
+            <FileSelectButton
             onFilesSelected={handleFiles}
             multiple
-            accept=".pdf, image/*"
+            accept=".jpg,.jpeg,.png,.pdf,.heic,.heif,.tiff,.bmp,.gif"
             label="Upload Files"
-            className="px-4 py-2 bg-blue-600 text-white rounded"
-          />
-        </div> */}
+            />
+          {selectedFiles.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {selectedFiles.map((file, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center bg-muted text-foreground px-3 py-1 rounded-full text-sm shadow border border-border max-w-xs truncate"
+                  title={file.name}
+                >
+                  <span className="truncate max-w-[120px]">{file.name}</span>
+                  <button
+                    type="button"
+                    className="ml-2 text-muted-foreground hover:text-destructive focus:outline-none"
+                    aria-label={`Remove ${file.name}`}
+                    onClick={() => {
+                      setSelectedFiles((prev) => prev.filter((_, i) => i !== idx));
+                    }}
+                  >
+                    &times;
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="flex gap-2">
           <Button
             type="button"

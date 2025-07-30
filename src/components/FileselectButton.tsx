@@ -31,8 +31,8 @@ export const FileSelectButton: React.FC<FileSelectButtonProps> = ({
   };
 
   return (
-    <>
-      <Button variant="outline" onClick={handleButtonClick}>
+    <div className="w-full max-w-md">
+      <Button variant="outline" onClick={handleButtonClick} type="button">
         {label}
       </Button>
       <input
@@ -42,7 +42,9 @@ export const FileSelectButton: React.FC<FileSelectButtonProps> = ({
         multiple={multiple}
         accept={accept}
         onChange={handleChange}
+        aria-label="File select input"
+        className="w-full max-w-96"
       />
-    </>
+    </div>
   );
 };

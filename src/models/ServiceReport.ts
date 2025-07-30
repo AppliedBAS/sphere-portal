@@ -73,15 +73,17 @@ export const serviceReportConverter: FirestoreDataConverter<ServiceReport> = {
       printedName: data["printed-name"],
       serviceAddress1: data["service-address1"],
       serviceAddress2: data["service-address2"],
-      serviceNotes: data["service-notes"].map((note: DocumentData) => ({
-        date: note.date,
-        helperOvertime: note["helper-overtime"],
-        helperTime: note["helper-time"],
-        remoteWork: note["remote-work"],
-        serviceNotes: note["service-notes"],
-        technicianOvertime: note["technician-overtime"],
-        technicianTime: note["technician-time"],
-      })),
+      serviceNotes: Array.isArray(data["service-notes"])
+        ? data["service-notes"].map((note: DocumentData) => ({
+            date: note.date,
+            helperOvertime: note["helper-overtime"],
+            helperTime: note["helper-time"],
+            remoteWork: note["remote-work"],
+            serviceNotes: note["service-notes"],
+            technicianOvertime: note["technician-overtime"],
+            technicianTime: note["technician-time"],
+          }))
+        : [],
       warranty: data.warranty ?? false,
     };
   },

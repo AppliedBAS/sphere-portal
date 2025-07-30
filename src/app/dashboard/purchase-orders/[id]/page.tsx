@@ -76,14 +76,18 @@ const PurchaseOrderDetailPage = () => {
       <h1 className="text-3xl font-bold mb-2">PO {order.docId}</h1>
       <div className="mb-6">
         <Badge
-          variant={order.status?.toLowerCase() === "open" ? "outline" : "default"}
+          variant={
+            order.status?.toLowerCase() === "open"
+              ? "outline"
+              : order.status?.toLowerCase() === "closed"
+              ? "default"
+              : "secondary"
+          }
           className={
             order.status?.toLowerCase() === "open"
               ? "text-yellow-800 border-yellow-300 bg-yellow-50"
-              : order.status?.toLowerCase() === "approved"
+              : order.status?.toLowerCase() === "closed"
               ? "text-green-800 border-green-300 bg-green-50"
-              : order.status?.toLowerCase() === "rejected"
-              ? "text-red-800 border-red-300 bg-red-50"
               : ""
           }
         >
