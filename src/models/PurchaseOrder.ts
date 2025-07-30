@@ -25,8 +25,12 @@ export interface PurchaseOrderMessage {
     other: string | null;
     vendor: string;
     amount: number;
-    attachment_content: string[];
-    attachment_name: string[];
+    attachments: Attachment[];
+}
+
+export interface Attachment {
+    content: string;
+    type: string;
 }
 
 export const purchaseOrderConverter: FirestoreDataConverter<PurchaseOrder> = {

@@ -17,7 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ChevronUp, ChevronDown, MoreHorizontal } from "lucide-react";
+import { ChevronUp, ChevronDown, MoreHorizontal, ClipboardList } from "lucide-react";
 
 import {
   DropdownMenu,
@@ -26,10 +26,13 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import { DashboardCard } from "@/components/DashboardCard";
+import { useRouter } from "next/navigation";
 
 export default function PurchaseOrders() {
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   // --- Table state ---
   const [searchTerm, setSearchTerm] = useState("");
@@ -143,6 +146,19 @@ export default function PurchaseOrders() {
       
       <h1 className="text-3xl font-bold">Purchase Orders</h1>
 
+      {/* Mobile card layout (default) */}
+      <div className="grid grid-cols-1 gap-4 md:hidden">
+        {[...orders].sort((a, b) => b.docId - a.docId).map((order) => (
+          <DashboardCard
+            key={order.id}
+            icon={<ClipboardList />}
+            title={order.vendor}
+            subtitle={`PO ${order.docId}`}
+            date={order.createdAt.toDate().toLocaleDateString()}
+            onOpen={() => router.push(`/dashboard/purchase-orders/${order.id}`)}
+          />
+        ))}
+      </div>
       {/* Search Input */}
       <div className="flex items-center gap-2">
         <Input

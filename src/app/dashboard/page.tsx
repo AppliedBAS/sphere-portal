@@ -33,7 +33,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     const unsubscribePR = onSnapshot(
-      query(collection(firestore, "project reports"), where("draft", "==", true)),
+      query(
+        collection(firestore, "project reports"),
+        where("draft", "==", true)
+      ),
       (snapshot) => {
         setData((prevData) => ({
           ...prevData,
@@ -180,15 +183,18 @@ export default function Dashboard() {
     </div>
   );
 
+  if (loading) {
+    return <p>Loading...</p>;
+  }
+
   return (
     <div className="space-y-6 pb-8">
-      
       {/* Title and Create Button */}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <Dialog>
           <DialogTrigger asChild>
-            <Button variant="secondary" className="text-lg md:text-sm">Create New Report</Button>
+            <Button variant="default">Create</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -226,72 +232,68 @@ export default function Dashboard() {
         </Dialog>
       </div>
 
-      {loading ? (
-        <p>Loading...</p>
-      ) : (
-        <Tabs defaultValue="all" className="space-y-4">
-          <TabsList className="grid grid-cols-4 w-full">
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="orders">POs</TabsTrigger>
-            <TabsTrigger value="services">SRs</TabsTrigger>
-            <TabsTrigger value="projects">PRs</TabsTrigger>
-          </TabsList>
+      <Tabs defaultValue="all" className="space-y-4">
+        <TabsList className="grid grid-cols-4 w-full">
+          <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="orders">POs</TabsTrigger>
+          <TabsTrigger value="services">SRs</TabsTrigger>
+          <TabsTrigger value="projects">PRs</TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="all">
-            <section>
-              <h2 className="text-xl font-semibold mb-4">Purchase Orders</h2>
-              {data.purchaseOrders.length === 0 ? (
-                <p>No purchase orders found.</p>
-              ) : (
-                renderPurchaseOrderCards(data.purchaseOrders)
-              )}
-            </section>
-            <section className="mt-8">
-              <h2 className="text-xl font-semibold mb-4">Service Reports</h2>
-              {data.serviceReports.length === 0 ? (
-                <p>No service reports found.</p>
-              ) : (
-                renderServiceReportCards(data.serviceReports)
-              )}
-            </section>
-            <section className="mt-8">
-              <h2 className="text-xl font-semibold mb-4">Project Reports</h2>
-              {data.projectReports.length === 0 ? (
-                <p>No project reports found.</p>
-              ) : (
-                renderProjectReportCards(data.projectReports)
-              )}
-            </section>
-          </TabsContent>
-
-          <TabsContent value="orders">
+        <TabsContent value="all">
+          <section>
             <h2 className="text-xl font-semibold mb-4">Purchase Orders</h2>
             {data.purchaseOrders.length === 0 ? (
               <p>No purchase orders found.</p>
             ) : (
               renderPurchaseOrderCards(data.purchaseOrders)
             )}
-          </TabsContent>
-
-          <TabsContent value="services">
+          </section>
+          <section className="mt-8">
             <h2 className="text-xl font-semibold mb-4">Service Reports</h2>
             {data.serviceReports.length === 0 ? (
               <p>No service reports found.</p>
             ) : (
               renderServiceReportCards(data.serviceReports)
             )}
-          </TabsContent>
-
-          <TabsContent value="projects">
+          </section>
+          <section className="mt-8">
             <h2 className="text-xl font-semibold mb-4">Project Reports</h2>
             {data.projectReports.length === 0 ? (
               <p>No project reports found.</p>
             ) : (
               renderProjectReportCards(data.projectReports)
             )}
-          </TabsContent>
-        </Tabs>
-      )}
+          </section>
+        </TabsContent>
+
+        <TabsContent value="orders">
+          <h2 className="text-xl font-semibold mb-4">Purchase Orders</h2>
+          {data.purchaseOrders.length === 0 ? (
+            <p>No purchase orders found.</p>
+          ) : (
+            renderPurchaseOrderCards(data.purchaseOrders)
+          )}
+        </TabsContent>
+
+        <TabsContent value="services">
+          <h2 className="text-xl font-semibold mb-4">Service Reports</h2>
+          {data.serviceReports.length === 0 ? (
+            <p>No service reports found.</p>
+          ) : (
+            renderServiceReportCards(data.serviceReports)
+          )}
+        </TabsContent>
+
+        <TabsContent value="projects">
+          <h2 className="text-xl font-semibold mb-4">Project Reports</h2>
+          {data.projectReports.length === 0 ? (
+            <p>No project reports found.</p>
+          ) : (
+            renderProjectReportCards(data.projectReports)
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
