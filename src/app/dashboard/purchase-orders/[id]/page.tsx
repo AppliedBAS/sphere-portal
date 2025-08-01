@@ -73,7 +73,7 @@ const PurchaseOrderDetailPage = () => {
       </Breadcrumb>
 
       {/* Title */}
-      <h1 className="text-3xl font-bold mb-2">PO {order.docId}</h1>
+      <h1 className="text-2xl font-bold mb-2">PO {order.docId}</h1>
       <div className="mb-6">
         <Badge
           variant={

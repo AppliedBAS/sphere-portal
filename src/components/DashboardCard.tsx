@@ -25,7 +25,7 @@ export function DashboardCard({
         {/* Content middle */}
         <div className="flex-1 flex flex-col justify-center">
             <div className="flex justify-between items-center mb-1">
-                <span className="text-base md:text-xs">{subtitle}</span>
+                <span className="text-xs">{subtitle}</span>
                 <span className="text-base md:text-xs text-muted-foreground">{date}</span>
             </div>
           <span className="font-bold text-lg leading-tight mb-1">{title}</span>

@@ -22,7 +22,7 @@ export default function NavDocuments({ items }: { items: Item[] }) {
                   }}>
                     <Link href={item.url} className="flex items-center space-x-2">
                       {item.icon && <item.icon />}
-                      <span className="text-lg md:text-sm">{item.title}</span>
+                      <span className="text-base md:text-sm">{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

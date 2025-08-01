@@ -64,7 +64,7 @@ const EditPurchaseOrderPage = () => {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <h1 className="text-3xl font-bold">Edit Purchase Order</h1>
+      <h1 className="text-2xl font-bold">Edit Purchase Order</h1>
       <PurchaseOrderForm purchaseOrder={purchaseOrder} />
     </div>
   );

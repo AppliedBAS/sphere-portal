@@ -68,7 +68,7 @@ const EditProjectReportPage = () => {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <h1 className="text-3xl font-bold">Edit Project Report</h1>
+      <h1 className="text-2xl font-bold">Edit Project Report</h1>
       <ProjectReportForm projectReport={projectReport} />
     </div>
   );
