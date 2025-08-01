@@ -9,7 +9,6 @@ export default function Home() {
   const { user } = useAuth();
   useEffect(() => {
     if (user) {
-      console.log("User is authenticated, redirecting to dashboard");
       router.push("/dashboard");
       return;
     }

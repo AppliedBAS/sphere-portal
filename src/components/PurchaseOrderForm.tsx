@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { Attachment, PurchaseOrder, purchaseOrderConverter, PurchaseOrderMessage } from "@/models/PurchaseOrder";
 import { Input } from "@/components/ui/input";
+import { Project, ProjectHit } from "@/models/Project";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -12,7 +13,7 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { Loader2 } from "lucide-react";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
 import { toast } from "sonner";
 import VendorSelect from "./VendorSelect";
@@ -22,13 +23,12 @@ import { Employee, employeeConverter } from "@/models/Employee";
 import { Switch } from "@/components/ui/switch";
 import { getEmployeeByEmail } from "@/lib/services";
 import { useAuth } from "@/contexts/AuthContext";
-import ProjectReportSelect from "./ProjectReportSelect";
 import { ServiceReport } from "@/models/ServiceReport";
-import { ProjectReport } from "@/models/ProjectReport";
-import { fetchDraftProjectReports, fetchDraftServiceReports } from "@/services/reportService";
+import { fetchDraftServiceReports } from "@/services/reportService";
 import { Textarea } from "./ui/textarea";
 import ServiceReportSelect from "./ServiceReportSelect";
 import { FileSelectButton } from "./FileselectButton";
+import ProjectSelect from "./ProjectSelect";
 
 interface PurchaseOrderFormProps {
   purchaseOrder: PurchaseOrder;
@@ -47,9 +47,8 @@ export default function PurchaseOrderForm({
   const [otherCategory, setOtherCategory] = useState(
     purchaseOrder.otherCategory || ""
   );
-  const [projectReports, setProjectReports] = useState<ProjectReport[]>([]);
   const [serviceReports, setServiceReports] = useState<ServiceReport[]>([]);
-  const [selectedProjectReport, setSelectedProjectReport] = useState<ProjectReport | null>(null);
+  const [selectedProject, setSelectedProject] = useState<ProjectHit | null>(null);
   const [selectedServiceReport, setSelectedServiceReport] = useState<ServiceReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [submittedOrderId, setSubmittedOrderId] = useState<string | null>(null);
@@ -62,82 +61,92 @@ export default function PurchaseOrderForm({
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   const canSubmit: boolean = !!description && !!amount && !!vendor && (
-    (categoryType === "project" && !!selectedProjectReport) ||
+    (categoryType === "project" && !!selectedProject) ||
     (categoryType === "service" && !!selectedServiceReport) ||
     (categoryType === "other" && !!otherCategory)
   );
 
   useEffect(() => {
     async function initForm() {
-      if (!purchaseOrder) return;
+    if (!purchaseOrder) return;
 
-      setLoading(true);
-      if (purchaseOrder.vendor) {
-        const vendorData: Vendor | null = await fetchVendorByName(
-          purchaseOrder.vendor
-        );
+    setLoading(true);
+    
+    if (purchaseOrder.vendor) {
+      const vendorData: Vendor | null = await fetchVendorByName(
+        purchaseOrder.vendor
+      );
 
-        if (vendorData) {
-          setVendor({
-            objectID: vendorData.id,
-            name: vendorData.name,
-            active: vendorData.active,
-            id: vendorData.id,
-          });
-        }
+      if (vendorData) {
+        setVendor({
+          objectID: vendorData.id,
+          name: vendorData.name,
+          active: vendorData.active,
+          id: vendorData.id,
+        });
       }
-
-      if (purchaseOrder.technicianRef) {
-        const empSnap = await getDoc(
-          purchaseOrder.technicianRef.withConverter(employeeConverter)
-        );
-        if (empSnap.exists()) {
-          const emp = empSnap.data() as Employee;
-          setTechnician(emp);
-        }
-      }
-
-      const draftPR = await fetchDraftProjectReports();
-      const draftSR = await fetchDraftServiceReports();
-
-      if (purchaseOrder.projectDocId) {
-        const projectReport = draftPR.find(
-          (r) => r.projectDocId === purchaseOrder.projectDocId
-        );
-
-        setSelectedProjectReport(projectReport || null);
-        setCategoryType("project");
-      } else if (purchaseOrder.serviceReportDocId) {
-        const serviceReport = draftSR.find(
-          (r) => r.docId === purchaseOrder.serviceReportDocId
-        );
-        setSelectedServiceReport(serviceReport || null);
-        setCategoryType("service");
-      } else if (purchaseOrder.otherCategory) {
-        setOtherCategory(purchaseOrder.otherCategory);
-        setCategoryType("other");
-      } else {
-        setCategoryType("other");
-      }
-
-      setProjectReports(draftPR);
-      setServiceReports(draftSR);
-      setLoading(false);
     }
+
+    if (purchaseOrder.technicianRef) {
+      const empSnap = await getDoc(
+        purchaseOrder.technicianRef.withConverter(employeeConverter)
+      );
+      if (empSnap.exists()) {
+        const emp = empSnap.data() as Employee;
+        setTechnician(emp);
+      }
+    }
+
+    const draftSR = await fetchDraftServiceReports();
+
+    if (purchaseOrder.projectDocId) {
+      // Fetch the project by docId
+      const q = query(
+        collection(firestore, "projects"),
+        where("doc-id", "==", purchaseOrder.projectDocId)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const proj = snap.docs[0].data() as Project;
+        setSelectedProject({
+          objectID: snap.docs[0].id,
+          docId: proj.docId,
+          client: proj.client,
+          description: proj.description,
+          location: proj.location,
+        });
+      }
+      setCategoryType("project");
+    } else if (purchaseOrder.serviceReportDocId) {
+      const serviceReport = draftSR.find(
+        (r) => r.docId === purchaseOrder.serviceReportDocId
+      );
+      setSelectedServiceReport(serviceReport || null);
+      setCategoryType("service");
+    } else if (purchaseOrder.otherCategory) {
+      setOtherCategory(purchaseOrder.otherCategory);
+      setCategoryType("other");
+    } else {
+      setCategoryType("other");
+    }
+    setServiceReports(draftSR);
+    setLoading(false);
+  }
     initForm();
+    
   }, [purchaseOrder]);
 
   // Only show the input for the selected category, set others to null
   useEffect(() => {
     if (categoryType === "other") {
-      setSelectedProjectReport(null);
+      setSelectedProject(null);
       setSelectedServiceReport(null);
     } else if (categoryType === "project") {
       setOtherCategory("");
       setSelectedServiceReport(null);
     } else if (categoryType === "service") {
       setOtherCategory("");
-      setSelectedProjectReport(null);
+      setSelectedProject(null);
     }
   }, [purchaseOrder, categoryType]);
 
@@ -178,7 +187,7 @@ export default function PurchaseOrderForm({
         docId: purchaseOrder.docId,
         id: purchaseOrder.id,
         otherCategory: otherCategory || null,
-        projectDocId: selectedProjectReport ? Number(selectedProjectReport.projectDocId) : null,
+        projectDocId: selectedProject ? selectedProject.docId : null,
         serviceReportDocId: selectedServiceReport ? Number(selectedServiceReport.docId) : null,
         status: "OPEN",
         technicianRef: purchaseOrder.technicianRef,
@@ -245,14 +254,12 @@ export default function PurchaseOrderForm({
 
       const attachments = selectedFiles.length > 0 ? await buildAttachments(selectedFiles) : [];
 
-      console.log("Attachments built:", attachments[0].content);
-
       const message: PurchaseOrderMessage = {
         amount: amount,
         materials: description,
         purchase_order_num: purchaseOrder.docId,
-        project_info: selectedProjectReport
-          ? `${selectedProjectReport.projectDocId} - ${selectedProjectReport.docId} - ${selectedProjectReport.clientName} - ${selectedProjectReport.location}`
+        project_info: selectedProject
+          ? `${selectedProject.docId} - ${selectedProject.client} - ${selectedProject.location}`
           : null,
         service_report_info: selectedServiceReport
           ? `${selectedServiceReport.docId}`
@@ -267,7 +274,7 @@ export default function PurchaseOrderForm({
 
       // check that only 1 of the 3 category fields is set
       if (
-        (categoryType === "project" && !selectedProjectReport) ||
+        (categoryType === "project" && !selectedProject) ||
         (categoryType === "service" && !selectedServiceReport) ||
         (categoryType === "other" && !otherCategory)
       ) {
@@ -297,7 +304,7 @@ export default function PurchaseOrderForm({
         docId: purchaseOrder.docId,
         id: purchaseOrder.id,
         otherCategory: otherCategory || null,
-        projectDocId: selectedProjectReport ? Number(selectedProjectReport.projectDocId) : null,
+        projectDocId: selectedProject ? selectedProject.docId : null,
         serviceReportDocId: selectedServiceReport ? Number(selectedServiceReport.docId) : null,
         status: "CLOSED",
         technicianRef: purchaseOrder.technicianRef,
@@ -369,7 +376,7 @@ export default function PurchaseOrderForm({
             placeholder="Select a vendor"
           />
         </div>
-        <div className="grid gap-2">
+        <div className="grid gap-4">
           <Label>Attach To *</Label>
           <div className="flex gap-4">
             <div className="flex items-center gap-2">
@@ -391,7 +398,7 @@ export default function PurchaseOrderForm({
                 }
                 id="switch-project"
               />
-              <Label htmlFor="switch-project">Project Report</Label>
+              <Label htmlFor="switch-project">Project</Label>
             </div>
             <div className="flex items-center gap-2">
               <Switch
@@ -420,10 +427,9 @@ export default function PurchaseOrderForm({
         {categoryType === "project" && (
           <div className="grid gap-2">
             <Label htmlFor="projectDocId">Project</Label>
-            <ProjectReportSelect
-              selectedReport={selectedProjectReport}
-              setSelectedReport={setSelectedProjectReport}
-              reports={projectReports}
+            <ProjectSelect
+              selectedProject={selectedProject}
+              setSelectedProject={setSelectedProject}
             />
           </div>
         )}
