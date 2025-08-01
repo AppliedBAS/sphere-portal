@@ -122,13 +122,6 @@ export default function ServiceReports() {
     return [...drafts, ...published];
   }, [sorted]);
 
-  // const canEdit = (report: ServiceReport) => {
-  //   if (report.docId === 379) {
-  //     console.log(firebaseUser?.id, report.assignedTechnicianRef);
-  //   }
-  //   return report.draft && firebaseUser?.id === report.assignedTechnicianRef?.id
-  // }
-
   // 4) Paginate
   const pageCount = Math.ceil(withStatusOrder.length / pageSize);
   const paginated = useMemo(() => {

@@ -9,8 +9,6 @@ import LogoDark from "../../../public/logo-dark.png"; // Adjust path as necessar
 import LogoLight from "../../../public/logo-light.png";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { getRedirectResult, OAuthProvider } from "firebase/auth";
-import { auth } from "@/lib/firebase";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,19 +20,6 @@ export default function LoginPage() {
       router.replace("/dashboard");
       return;
     }
-    
-    getRedirectResult(auth)
-      .then(result => {
-        if (!result) return; // No result means no redirect sign-in attempted
-        // Signed in
-        const user = result.user;
-        console.log('Signed in via redirect as', user.email);
-        const credential = OAuthProvider.credentialFromResult(result);
-        console.log('Access Token:', credential?.accessToken);
-      })
-      .catch(error => {
-        console.error('Redirect sign-in error:', error);
-      });
   }, [router, user]);
 
   const toggleTheme = () => {

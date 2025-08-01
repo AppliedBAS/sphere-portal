@@ -171,7 +171,7 @@ export default function Dashboard() {
           key={item.id}
           icon={<FolderIcon />}
           title={item.clientName}
-          subtitle={`PR ${item.projectDocId} - ${item.docId}`}
+          subtitle={`PR ${item.projectDocId} - ${item.docId} - ${item.location} - ${item.description}`}
           date={
             item.createdAt && item.createdAt.toDate
               ? item.createdAt.toDate().toLocaleDateString()

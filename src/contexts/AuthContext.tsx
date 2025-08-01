@@ -23,6 +23,7 @@ import {
 import { useRouter } from "next/navigation";
 import { Employee } from "@/models/Employee";
 import { getEmployeeByEmail } from "@/services/employeeService";
+import { FirebaseError } from "firebase/app";
 
 interface AuthContextValue {
   user: User | null;
@@ -67,7 +68,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(fbUser);
 
       if (fbUser?.email) {
-        console.log("User authenticated:", fbUser.email);
         getEmployeeByEmail(fbUser.email)
           .then(setFirebaseUser)
           .catch((error) => {
@@ -89,30 +89,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async () => {
     const provider = new OAuthProvider("microsoft.com");
-
     provider.setCustomParameters({
       prompt: "consent",
       tenant: 'ad969dc0-5f48-4d4a-89bc-c5b5532c5d6b'
     });
-    
-    signInWithPopup(auth, provider)
-      .then((result) => {
-        const user = result.user;
-        console.log("User signed in:", user.email);
-        // Optionally, you can redirect to a specific page after login
-        router.replace("/dashboard");
-      })
-      .catch(async (error) => {
-        if (error.code === "auth/popup-blocked" || error.code === "auth/popup-closed-by-user") {
-          await signInWithRedirect(auth, provider);
-        } else {
-          console.error("Login failed:", error);
-        }
-        setUser(null);
-        setFirebaseUser(null);
-        setLoading(false);
-        router.replace("/login");
-      });
+    try {
+      await signInWithPopup(auth, provider);
+      router.replace("/dashboard");
+    } catch (error) {
+      const err = error as FirebaseError;
+      if (err.code === "auth/popup-blocked" || err.code === "auth/popup-closed-by-user") {
+        await signInWithRedirect(auth, provider);
+      } else {
+        console.error("Login failed:", err);
+      }
+      setUser(null);
+      setFirebaseUser(null);
+      setLoading(false);
+      router.replace("/login");
+    }
   };
 
   const logout = async () => {
