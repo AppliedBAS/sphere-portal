@@ -27,7 +27,7 @@ const CreatePurchaseOrder: React.FC = () => {
         </BreadcrumbList>
       </Breadcrumb>
       <header className="mb-6">
-        <h1 className="text-3xl font-bold">Create Purchase Order</h1>
+        <h1 className="text-2xl font-bold">Create Purchase Order</h1>
       </header>
       <ReserveOrderForm />
     </div>

@@ -87,7 +87,7 @@ const ServiceReportViewPage = () => {
       </Breadcrumb>
 
       {/* Title */}
-      <h1 className="text-3xl font-bold mb-2">Service Report {report.docId}</h1>
+      <h1 className="text-2xl font-bold mb-2">Service Report {report.docId}</h1>
       <div className="mb-6">
         <Badge
           variant={report.draft ? "outline" : "default"}

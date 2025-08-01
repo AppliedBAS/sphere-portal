@@ -1175,7 +1175,7 @@ export default function ServiceReportForm({
               setSelectedEmployee={setAssignedTechnician}
               placeholder="Select Technician..."
             />
-            <p className="text-base sm:text-sm text-muted-foreground mt-2">
+            <p className="text-sm text-muted-foreground mt-2">
               Leave blank if you are the assigned technician.
             </p>
           </div>
@@ -1464,7 +1464,7 @@ export default function ServiceReportForm({
             />
             <p className="text-base sm:text-sm">{isWarranty ? "Yes" : "No"}</p>
           </div>
-          <p className="text-base sm:text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             If enabled, this will send the email to our system internally.
           </p>
 
@@ -1514,7 +1514,7 @@ export default function ServiceReportForm({
             {serviceNotesInputs.map((note, idx) => (
               <div key={idx} className="mt-4 border rounded-lg p-4 space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-lg md:text-sm font-semibold">
+                  <span className="text-sm text-muted-foreground">
                     Entry #{idx + 1}
                   </span>
                   {serviceNotesInputs.length > 1 && (
@@ -1717,7 +1717,7 @@ export default function ServiceReportForm({
                   ? assignedTechnician.email
                   : authorTechnician!.email!}
               </span>{" "}
-              is already included.
+              included.
             </Label>
 
             {emails.map((email, idx) => (

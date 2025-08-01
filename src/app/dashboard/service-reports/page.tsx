@@ -170,7 +170,7 @@ export default function ServiceReports() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <h1 className="text-3xl font-bold">Service Reports</h1>
+      <h1 className="text-2xl font-bold">Service Reports</h1>
 
       <div className="grid grid-cols-1 gap-4 md:hidden">
         {mobileReports.map((report) => (

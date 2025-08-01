@@ -167,7 +167,7 @@ export default function ProjectReports() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      <h1 className="text-3xl font-bold">Project Reports</h1>
+      <h1 className="text-2xl font-bold">Project Reports</h1>
 
       {/* Mobile card layout (default) */}
       <div className="grid grid-cols-1 gap-4 md:hidden">

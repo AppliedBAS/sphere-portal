@@ -191,7 +191,7 @@ export default function Dashboard() {
     <div className="space-y-6 pb-8">
       {/* Title and Create Button */}
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <h1 className="text-2xl font-bold">Dashboard</h1>
         <Dialog>
           <DialogTrigger asChild>
             <Button variant="default">Create</Button>
@@ -242,7 +242,7 @@ export default function Dashboard() {
 
         <TabsContent value="all">
           <section>
-            <h2 className="text-xl font-semibold mb-4">Purchase Orders</h2>
+            <h2 className="text-lg font-semibold mb-4">Purchase Orders</h2>
             {data.purchaseOrders.length === 0 ? (
               <p>No purchase orders found.</p>
             ) : (
@@ -250,7 +250,7 @@ export default function Dashboard() {
             )}
           </section>
           <section className="mt-8">
-            <h2 className="text-xl font-semibold mb-4">Service Reports</h2>
+            <h2 className="text-lg font-semibold mb-4">Service Reports</h2>
             {data.serviceReports.length === 0 ? (
               <p>No service reports found.</p>
             ) : (
@@ -258,7 +258,7 @@ export default function Dashboard() {
             )}
           </section>
           <section className="mt-8">
-            <h2 className="text-xl font-semibold mb-4">Project Reports</h2>
+            <h2 className="text-lg font-semibold mb-4">Project Reports</h2>
             {data.projectReports.length === 0 ? (
               <p>No project reports found.</p>
             ) : (
