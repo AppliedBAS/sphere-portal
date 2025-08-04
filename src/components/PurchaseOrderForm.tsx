@@ -212,6 +212,11 @@ export default function PurchaseOrderForm({
       return;
     }
 
+    if (selectedFiles.length == 0) {
+      toast.error("Please attach at least one receipt.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const currentEmployee = await getEmployeeByEmail(user.email!);
