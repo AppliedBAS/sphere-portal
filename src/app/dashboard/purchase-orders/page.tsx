@@ -1,126 +1,37 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { firestore } from "@/lib/firebase";
-import { collection, getDocs, Timestamp } from "firebase/firestore";
-import { purchaseOrderConverter, PurchaseOrder } from "@/models/PurchaseOrder";
-
-import {
-  Table,
-  TableHeader,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { ChevronUp, ChevronDown, MoreHorizontal, ClipboardList } from "lucide-react";
-
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-import { DashboardCard } from "@/components/DashboardCard";
 import { useRouter } from "next/navigation";
+import { ClipboardList } from "lucide-react";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { DashboardCard } from "@/components/DashboardCard";
+import { usePurchaseOrders } from "@/hooks/usePurchaseOrders";
+import { useTableState } from "@/hooks/useTableState";
+import { SearchFilters } from "@/components/purchase-orders/SearchFilters";
+import { PurchaseOrdersTable } from "@/components/purchase-orders/PurchaseOrdersTable";
+import { Pagination } from "@/components/purchase-orders/Pagination";
 
 export default function PurchaseOrders() {
-  const [orders, setOrders] = useState<PurchaseOrder[]>([]);
-  const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const { orders, loading, ordersCount, pageIndex, pageSize, amountRange, description, srDocId, projectDocId, setAmountRange, setDescription, setPageSize, setSrDocId, setProjectDocId } = usePurchaseOrders();
+  const {
+    sortColumn,
+    sortDirection,
+    toggleSort
+  } = useTableState();
 
-  // --- Table state ---
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortColumn, setSortColumn] = useState<
-    "docId" | "vendor" | "description" | "status" | "createdAt"
-  >("createdAt");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const [pageIndex, setPageIndex] = useState(0);
-  const pageSize = 25;
-
-  useEffect(() => {
-    async function fetchOrders() {
-      setLoading(true);
-      const querySnapshot = await getDocs(
-        collection(firestore, "orders").withConverter(purchaseOrderConverter)
-      );
-      const data = querySnapshot.docs.map((doc) => doc.data() as PurchaseOrder);
-      setOrders(data);
-      setLoading(false);
-    }
-    fetchOrders();
-  }, []);
-
-  // 1) Filter by searchTerm (vendor, description, status)
-  const filtered = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    if (!term) return orders;
-    return orders.filter((o) => {
-      return (
-        o.vendor.toLowerCase().includes(term) ||
-        o.description.toLowerCase().includes(term) ||
-        (o.status || "").toLowerCase().includes(term)
-      );
-    });
-  }, [orders, searchTerm]);
-
-  // 2) Sort by selected column & direction
-  const sorted = useMemo(() => {
-    return [...filtered].sort((a, b) => {
-      let aVal: string | number = "";
-      let bVal: string | number = "";
-      if (sortColumn === "vendor") {
-        aVal = a.vendor.toLowerCase();
-        bVal = b.vendor.toLowerCase();
-      } else if (sortColumn === "description") {
-        aVal = a.description.toLowerCase();
-        bVal = b.description.toLowerCase();
-      } else if (sortColumn === "status") {
-        aVal = (a.status || "").toLowerCase();
-        bVal = (b.status || "").toLowerCase();
-      } else if (sortColumn === "docId") {
-        aVal = a.docId;
-        bVal = b.docId;
-      } else {
-        // createdAt
-        aVal = a.createdAt.toMillis();
-        bVal = b.createdAt.toMillis();
-      }
-      if (aVal < bVal) {
-        return sortDirection === "asc" ? -1 : 1;
-      }
-      if (aVal > bVal) {
-        return sortDirection === "asc" ? 1 : -1;
-      }
-      return 0;
-    });
-  }, [filtered, sortColumn, sortDirection]);
-
-  // 3) Paginate
-  const pageCount = Math.ceil(sorted.length / pageSize);
-  const paginated = useMemo(() => {
-    const start = pageIndex * pageSize;
-    return sorted.slice(start, start + pageSize);
-  }, [sorted, pageIndex]);
-
-  // Helper to format Firestore Timestamp
-  const formatDate = (ts: Timestamp) => ts?.toDate().toLocaleString();
-
-  const toggleSort = (
-    column: "docId" | "vendor" | "description" | "status" | "createdAt"
-  ) => {
-    if (sortColumn === column) {
-      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortColumn(column);
-      setSortDirection("asc");
-    }
-    setPageIndex(0);
+  const search = () => {
+    const params = new URLSearchParams(window.location.search);
+    params.set("description", description);
+    params.set("pageSize", pageSize.toString());
+    router.push(`/dashboard/purchase-orders?${params.toString()}`);
   };
 
   if (loading) {
@@ -129,7 +40,6 @@ export default function PurchaseOrders() {
 
   return (
     <div className="space-y-4">
-      {/* Breadcrumb */}
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -143,195 +53,53 @@ export default function PurchaseOrders() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      
+
       <h1 className="text-2xl font-bold">Purchase Orders</h1>
 
-      {/* Mobile card layout (default) */}
+      {/* Mobile card layout */}
       <div className="grid grid-cols-1 gap-4 md:hidden">
-        {[...orders].sort((a, b) => b.docId - a.docId).map((order) => (
-          <DashboardCard
-            key={order.id}
-            icon={<ClipboardList />}
-            title={order.vendor}
-            subtitle={`PO ${order.docId}`}
-            date={order.createdAt.toDate().toLocaleDateString()}
-            onOpen={() => router.push(`/dashboard/purchase-orders/${order.id}`)}
-          />
-        ))}
-      </div>
-      {/* Search Input */}
-      <div className="flex items-center gap-2">
-        <Input
-          placeholder="Search by vendor, description, or status…"
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.currentTarget.value);
-            setPageIndex(0);
-          }}
-          className="max-w-sm"
-        />
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => {
-            setSearchTerm("");
-            setPageIndex(0);
-          }}
-        >
-          Clear
-        </Button>
-      </div>
-
-      {/* Table */}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead
-              className="cursor-pointer"
-              onClick={() => toggleSort("docId")}
-            >
-              <div className="flex items-center">
-                Doc&nbsp;ID
-                {sortColumn === "docId" &&
-                  (sortDirection === "asc" ? (
-                    <ChevronUp className="h-4 w-4 ml-1" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 ml-1" />
-                  ))}
-              </div>
-            </TableHead>
-            <TableHead
-              className="cursor-pointer"
-              onClick={() => toggleSort("vendor")}
-            >
-              <div className="flex items-center">
-                Vendor
-                {sortColumn === "vendor" &&
-                  (sortDirection === "asc" ? (
-                    <ChevronUp className="h-4 w-4 ml-1" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 ml-1" />
-                  ))}
-              </div>
-            </TableHead>
-            <TableHead
-              className="cursor-pointer"
-              onClick={() => toggleSort("description")}
-            >
-              <div className="flex items-center">
-                Description
-                {sortColumn === "description" &&
-                  (sortDirection === "asc" ? (
-                    <ChevronUp className="h-4 w-4 ml-1" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 ml-1" />
-                  ))}
-              </div>
-            </TableHead>
-            <TableHead
-              className="cursor-pointer"
-              onClick={() => toggleSort("status")}
-            >
-              <div className="flex items-center">
-                Status
-                {sortColumn === "status" &&
-                  (sortDirection === "asc" ? (
-                    <ChevronUp className="h-4 w-4 ml-1" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 ml-1" />
-                  ))}
-              </div>
-            </TableHead>
-            <TableHead
-              className="cursor-pointer"
-              onClick={() => toggleSort("createdAt")}
-            >
-              <div className="flex items-center">
-                Created At
-                {sortColumn === "createdAt" &&
-                  (sortDirection === "asc" ? (
-                    <ChevronUp className="h-4 w-4 ml-1" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 ml-1" />
-                  ))}
-              </div>
-            </TableHead>
-            <TableHead>Amount</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {paginated.map((order) => (
-            <TableRow key={order.id}>
-              <TableCell>{order.docId}</TableCell>
-              <TableCell>{order.vendor}</TableCell>
-              <TableCell className="max-w-xs truncate">{order.description}</TableCell>
-              <TableCell>
-                <Badge
-                  variant="outline"
-                  className={
-                    order.status === "approved"
-                      ? "text-green-800 border-green-300 bg-green-50"
-                      : order.status === "pending"
-                      ? "text-yellow-800 border-yellow-300 bg-yellow-50"
-                      : order.status === "rejected"
-                      ? "text-red-800 border-red-300 bg-red-50"
-                      : ""
-                  }
-                >
-                  {order.status || "Unknown"}
-                </Badge>
-              </TableCell>
-              <TableCell>{formatDate(order.createdAt)}</TableCell>
-              <TableCell>${order.amount?.toFixed(2)}</TableCell>
-              <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem asChild>
-                      <Link href={`/dashboard/purchase-orders/${order.id}`}>View</Link>
-                    </DropdownMenuItem>
-                    {order.status && order.status.toUpperCase() === "OPEN" && (
-                      <DropdownMenuItem asChild>
-                        <Link href={`/dashboard/purchase-orders/${order.id}/edit`}>Edit</Link>
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-            </TableRow>
+        {orders
+          .sort((a, b) => b.docId - a.docId)
+          .map((order) => (
+            <DashboardCard
+              key={order.id}
+              icon={<ClipboardList />}
+              title={order.vendor}
+              subtitle={`PO ${order.docId}`}
+              date={order.createdAt.toDate().toLocaleDateString()}
+              onOpen={() =>
+                router.push(`/dashboard/purchase-orders/${order.id}`)
+              }
+            />
           ))}
-        </TableBody>
-      </Table>
-
-      {/* Pagination Controls */}
-      <div className="flex items-center justify-between py-4">
-        <div className="text-sm text-gray-600">
-          Page {pageIndex + 1} of {pageCount}
-        </div>
-        <div className="space-x-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={pageIndex === 0}
-            onClick={() => setPageIndex((i) => Math.max(i - 1, 0))}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={pageIndex + 1 >= pageCount}
-            onClick={() => setPageIndex((i) => Math.min(i + 1, pageCount - 1))}
-          >
-            Next
-          </Button>
-        </div>
       </div>
+
+      <SearchFilters
+        searchDescription={description}
+        setSearchDescription={setDescription}
+        amountRange={amountRange}
+        setAmountRange={setAmountRange}
+        onSearch={search}
+      />
+
+      <PurchaseOrdersTable
+        orders={orders}
+        sortColumn={sortColumn}
+        sortDirection={sortDirection}
+        onSort={toggleSort}
+      />
+
+      {/* <Pagination
+        page={pageIndex}
+        pageSize={pageSize}
+        totalItems={ordersCount || 0}
+        onChange={search}
+        setPage={setPage}
+        setPageSize={(size: number) => {
+          // You may need to update this logic depending on your state management
+          router.push(`/dashboard/purchase-orders?page=1&pageSize=${size}`);
+        }}
+      /> */}
     </div>
   );
 }
