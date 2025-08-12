@@ -14,6 +14,21 @@ export interface PurchaseOrder {
     vendor: string;
 }
 
+export interface PurchaseOrderHit {
+    objectID: string;
+    amount: number;
+    createdAt: number;
+    description: string;
+    docId: number;
+    id: string;
+    otherCategory: string | null;
+    projectDocId: number | null;
+    serviceReportDocId: number | null;
+    status: string;
+    technicianRef: string;
+    vendor: string;
+}
+
 export interface PurchaseOrderMessage {
     technician_name: string;
     technician_phone: string;

@@ -1,25 +1,59 @@
-import { DocumentData, DocumentReference, DocumentSnapshot, FirestoreDataConverter, Timestamp } from "firebase/firestore";
-
+import {
+  DocumentData,
+  DocumentReference,
+  DocumentSnapshot,
+  FirestoreDataConverter,
+  Timestamp,
+} from "firebase/firestore";
 
 export interface ServiceReport {
-    id: string;
-    authorTechnicianRef: DocumentReference;
-    assignedTechnicianRef: DocumentReference | null;
-    cityStateZip: string;
-    clientName: string;
-    contactEmail: string;
-    contactPhone: string;
-    contactName: string;
-    createdAt: Timestamp;
-    docId: number;
-    dateSigned: Timestamp | null;
-    draft: boolean;
-    materialNotes: string;
-    printedName: string;
-    serviceAddress1: string;
-    serviceAddress2: string | null;
-    serviceNotes: ServiceNote[];
-    warranty: boolean | null; // Optional field for warranty status
+  id: string;
+  authorTechnicianRef: DocumentReference;
+  assignedTechnicianRef: DocumentReference | null;
+  cityStateZip: string;
+  clientName: string;
+  contactEmail: string;
+  contactPhone: string;
+  contactName: string;
+  createdAt: Timestamp;
+  docId: number;
+  dateSigned: Timestamp | null;
+  draft: boolean;
+  materialNotes: string;
+  printedName: string;
+  serviceAddress1: string;
+  serviceAddress2: string | null;
+  serviceNotes: ServiceNote[];
+  warranty: boolean | null; // Optional field for warranty status
+}
+
+export interface ServiceReportHit {
+  objectID: string; // Algolia requires an objectID field
+  id: string;
+  authorTechnicianRef: string;
+  cityStateZip: string;
+  clientName: string;
+  contactEmail: string;
+  contactPhone: string;
+  contactName: string;
+  createdAt: string;
+  docId: number;
+  draft: boolean;
+  materialNotes: string;
+  serviceAddress1: string;
+  serviceAddress2: string | null;
+  serviceNotes: ServiceReportNoteHit[];
+  warranty: boolean | null; // Optional field for warranty status
+}
+
+export interface ServiceReportNoteHit {
+  date: string;
+  helperOvertime: string;
+  helperTime: string;
+  remoteWork: string;
+  serviceNotes: string;
+  technicianOvertime: string;
+  technicianTime: string;
 }
 
 export const serviceReportConverter: FirestoreDataConverter<ServiceReport> = {
@@ -41,20 +75,18 @@ export const serviceReportConverter: FirestoreDataConverter<ServiceReport> = {
       "service-address1": report.serviceAddress1,
       "service-address2": report.serviceAddress2,
       "service-notes": report.serviceNotes.map((note) => ({
-            date: note.date,
-            "helper-overtime": note.helperOvertime,
-            "helper-time": note.helperTime,
-            "remote-work": note.remoteWork,
-            "service-notes": note.serviceNotes,
-            "technician-overtime": note.technicianOvertime,
-            "technician-time": note.technicianTime,
-          })),
+        date: note.date,
+        "helper-overtime": note.helperOvertime,
+        "helper-time": note.helperTime,
+        "remote-work": note.remoteWork,
+        "service-notes": note.serviceNotes,
+        "technician-overtime": note.technicianOvertime,
+        "technician-time": note.technicianTime,
+      })),
       warranty: report.warranty,
     };
   },
-  fromFirestore(
-    snapshot: DocumentSnapshot
-  ): ServiceReport {
+  fromFirestore(snapshot: DocumentSnapshot): ServiceReport {
     const data = snapshot.data()!;
     return {
       id: snapshot.id,
@@ -90,18 +122,18 @@ export const serviceReportConverter: FirestoreDataConverter<ServiceReport> = {
 };
 
 export interface ServiceNote {
-    date: Timestamp;
-    helperOvertime: string;
-    helperTime: string;
-    remoteWork: string;
-    serviceNotes: string;
-    technicianOvertime: string;
-    technicianTime: string;
+  date: Timestamp;
+  helperOvertime: string;
+  helperTime: string;
+  remoteWork: string;
+  serviceNotes: string;
+  technicianOvertime: string;
+  technicianTime: string;
 }
 
 export interface ServiceReportMessage {
   report_no: number;
-  date: string;              // e.g. "2025-06-05"
+  date: string; // e.g. "2025-06-05"
   client_name: string;
   service_address: string;
   city_state_zip: string;
@@ -109,28 +141,28 @@ export interface ServiceReportMessage {
   contact_phone: string;
   contact_email: string;
   signature?: string | null;
-  t_time: number;            // total technician hours (e.g. 3.5)
-  t_ot: number;              // technician overtime hours (e.g. 1.0)
-  h_time: number;            // helper hours (e.g. 2.0)
-  h_ot: number;              // helper overtime hours (e.g. 0.5)
-  materials: string;         // e.g. "Copper tubing, valves"
+  t_time: number; // total technician hours (e.g. 3.5)
+  t_ot: number; // technician overtime hours (e.g. 1.0)
+  h_time: number; // helper hours (e.g. 2.0)
+  h_ot: number; // helper overtime hours (e.g. 0.5)
+  materials: string; // e.g. "Copper tubing, valves"
   notes: Array<{
-    date: string;            // format "YYYY-MM-DD"
+    date: string; // format "YYYY-MM-DD"
     t_time: number; // e.g. 3.5
     t_ot: number;
     h_time: number;
     h_ot: number;
-    remote: string;     // e.g. "Remote diagnostics only"
-    note: string;           // free‐form text about that day’s work
+    remote: string; // e.g. "Remote diagnostics only"
+    note: string; // free‐form text about that day’s work
   }>;
   technician_name: string;
   technician_phone: string;
   technician_email: string;
   print_name?: string | null;
-  sign_date?: string | null;  // e.g. "2025-06-05"
-  to_emails: string[];        // list of all recipients’ emails
-  start_date: string;         // e.g. "2025-06-03"
-  end_date: string;           // e.g. "2025-06-05"
+  sign_date?: string | null; // e.g. "2025-06-05"
+  to_emails: string[]; // list of all recipients’ emails
+  start_date: string; // e.g. "2025-06-03"
+  end_date: string; // e.g. "2025-06-05"
 }
 
 export interface ServiceReportPDFMessage {
@@ -149,13 +181,13 @@ export interface ServiceReportPDFMessage {
   h_ot: number;
   materials: string;
   notes: Array<{
-    date: string;            // format "YYYY-MM-DD"
+    date: string; // format "YYYY-MM-DD"
     t_time: number; // e.g. 3.5
     t_ot: number;
     h_time: number;
     h_ot: number;
-    remote: string;     // e.g. "Remote diagnostics only"
-    note: string;           // free‐form text about that day’s work
+    remote: string; // e.g. "Remote diagnostics only"
+    note: string; // free‐form text about that day’s work
   }>;
   technician_name: string;
   technician_phone: string;

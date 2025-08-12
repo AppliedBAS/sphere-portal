@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { Timestamp } from "firebase/firestore";
-import { PurchaseOrderHit } from "@/models/PurchaseOrder";
+import { ProjectReportHit } from "@/models/ProjectReport";
 import {
   Table,
   TableHeader,
@@ -19,52 +18,46 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 
-interface PurchaseOrdersTableProps {
-  orders: PurchaseOrderHit[];
+interface ProjectReportsTableProps {
+  reports: ProjectReportHit[];
 }
 
-export function PurchaseOrdersTable({
-  orders,
-}: PurchaseOrdersTableProps) {
-  const formatDate = (ts: Timestamp) => ts?.toDate().toLocaleString();
-
+export function ProjectReportsTable({ reports }: ProjectReportsTableProps) {
   return (
     <Table>
       <TableHeader>
         <TableRow>
+          <TableHead>Project Doc ID</TableHead>
           <TableHead>Doc ID</TableHead>
-          <TableHead>Vendor</TableHead>
+          <TableHead>Client</TableHead>
+          <TableHead>Location</TableHead>
           <TableHead>Description</TableHead>
-          <TableHead>Status</TableHead>
           <TableHead>Created At</TableHead>
-          <TableHead>Amount</TableHead>
+          <TableHead>Status</TableHead>
           <TableHead>Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {orders.map((order) => (
-          <TableRow key={order.objectID}>
-            <TableCell>{order.docId}</TableCell>
-            <TableCell>{order.vendor}</TableCell>
-            <TableCell className="max-w-xs truncate">
-              {order.description}
-            </TableCell>
+        {reports.map((report) => (
+          <TableRow key={report.objectID}>
+            <TableCell>{report.projectDocId}</TableCell>
+            <TableCell>{report.docId}</TableCell>
+            <TableCell>{report.clientName}</TableCell>
+            <TableCell className="max-w-xs truncate">{report.location}</TableCell>
+            <TableCell className="max-w-xs truncate">{report.description}</TableCell>
+            <TableCell>{new Date(report.createdAt).toLocaleString()}</TableCell>
             <TableCell>
               <Badge
                 variant="outline"
                 className={
-                  order.status?.toLowerCase() === "closed"
-                    ? "text-green-800 border-green-300 bg-green-50"
-                    : order.status?.toLowerCase() === "open"
+                  report.draft
                     ? "text-orange-800 border-orange-300 bg-orange-50"
-                    : ""
+                    : "text-green-800 border-green-300 bg-green-50"
                 }
               >
-                {order.status || "Unknown"}
+                {report.draft ? "Draft" : "Completed"}
               </Badge>
             </TableCell>
-            <TableCell>{formatDate(Timestamp.fromMillis(order.createdAt))}</TableCell>
-            <TableCell>${order.amount?.toFixed(2)}</TableCell>
             <TableCell>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -74,13 +67,24 @@ export function PurchaseOrdersTable({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem asChild>
-                    <Link href={`/dashboard/purchase-orders/${order.objectID}`}>
+                    <Link href={`/dashboard/project-reports/${report.objectID}`}>
                       View
                     </Link>
                   </DropdownMenuItem>
-                  {order.status?.toUpperCase() === "OPEN" && (
+                  {!report.draft && (
                     <DropdownMenuItem asChild>
-                      <Link href={`/dashboard/purchase-orders/${order.objectID}/edit`}>
+                      <a
+                        href={`https://storage.googleapis.com/appliedbas-service-report-gen.appspot.com/reports/project/Project%20Report%20${report.projectDocId}%20-%20${report.docId}.pdf`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        View PDF
+                      </a>
+                    </DropdownMenuItem>
+                  )}
+                  {report.draft && (
+                    <DropdownMenuItem asChild>
+                      <Link href={`/dashboard/project-reports/${report.objectID}/edit`}>
                         Edit
                       </Link>
                     </DropdownMenuItem>

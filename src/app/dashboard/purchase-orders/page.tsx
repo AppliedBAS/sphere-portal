@@ -13,30 +13,77 @@ import {
 } from "@/components/ui/breadcrumb";
 import { DashboardCard } from "@/components/DashboardCard";
 import { usePurchaseOrders } from "@/hooks/usePurchaseOrders";
-import { useTableState } from "@/hooks/useTableState";
 import { SearchFilters } from "@/components/purchase-orders/SearchFilters";
 import { PurchaseOrdersTable } from "@/components/purchase-orders/PurchaseOrdersTable";
-import { Pagination } from "@/components/purchase-orders/Pagination";
+import { Pagination } from "@/components/Pagination";
+import { MAX_AMOUNT } from "@/lib/utils";
 
 export default function PurchaseOrders() {
   const router = useRouter();
-  const { orders, loading, ordersCount, pageIndex, pageSize, amountRange, description, srDocId, projectDocId, setAmountRange, setDescription, setPageSize, setSrDocId, setProjectDocId } = usePurchaseOrders();
-  const {
-    sortColumn,
-    sortDirection,
-    toggleSort
-  } = useTableState();
 
-  const search = () => {
-    const params = new URLSearchParams(window.location.search);
-    params.set("description", description);
-    params.set("pageSize", pageSize.toString());
-    router.push(`/dashboard/purchase-orders?${params.toString()}`);
+  const { orders, loading, ordersCount, totalCount, totalPages, qMinAmount, qMaxAmount, qDescription, qStatus, qVendor, qPage, qPageSize } = usePurchaseOrders();
+
+  const handleDescriptionChange = (description: string) => {
+    window.location.href = `/dashboard/purchase-orders?${buildSearchParams(description, qMinAmount, qMaxAmount, qVendor, qStatus)}`;
   };
 
-  if (loading) {
-    return <div>Loading...</div>;
-  }
+  const handleAmountChange = (minAmount: number, maxAmount: number) => {
+    window.location.href = `/dashboard/purchase-orders?${buildSearchParams(qDescription, minAmount, maxAmount, qVendor, qStatus, qPage, qPageSize)}`;
+  };
+
+  const handleVendorChange = (vendor: string) => {
+    window.location.href = `/dashboard/purchase-orders?${buildSearchParams(qDescription, qMinAmount, qMaxAmount, vendor, qStatus, qPage, qPageSize)}`;
+  };
+
+  const handleStatusChange = (status: string) => {
+    window.location.href = `/dashboard/purchase-orders?${buildSearchParams(qDescription, qMinAmount, qMaxAmount, qVendor, status, qPage, qPageSize)}`;
+  };
+
+  const handleFilterReset = () => {
+    window.location.href = `/dashboard/purchase-orders`;
+  };
+
+  const handlePageChange = (page: number) => {
+    window.location.href = `/dashboard/purchase-orders?${buildSearchParams(qDescription, qMinAmount, qMaxAmount, qVendor, qStatus, page, qPageSize)}`;
+  };
+
+  const handlePageSizeChange = (pageSize: number) => {
+    window.location.href = `/dashboard/purchase-orders?${buildSearchParams(qDescription, qMinAmount, qMaxAmount, qVendor, qStatus, qPage, pageSize)}`;
+  };
+
+  const buildSearchParams = (
+    description: string,
+    minAmount: number,
+    maxAmount: number,
+    vendor: string,
+    status: string,
+    page?: number,
+    pageSize?: number
+  ) => {
+    const params = new URLSearchParams();
+    if (description) {
+      params.set("description", description);
+    }
+    if (vendor) {
+      params.set("vendor", vendor);
+    }
+    if (status) {
+      params.set("status", status);
+    }
+    if (minAmount !== 0 || maxAmount !== MAX_AMOUNT) {
+      params.set("minAmount", minAmount.toString());
+      params.set("maxAmount", maxAmount.toString());
+    }
+    if (page) {
+      params.set("page", page.toString());
+    }
+    if (pageSize) {
+      params.set("pageSize", pageSize.toString());
+    }
+    return params;
+  };
+
+  if (loading) return <div>Loading...</div>;
 
   return (
     <div className="space-y-4">
@@ -56,17 +103,17 @@ export default function PurchaseOrders() {
 
       <h1 className="text-2xl font-bold">Purchase Orders</h1>
 
-      {/* Mobile card layout */}
       <div className="grid grid-cols-1 gap-4 md:hidden">
         {orders
+          .slice()
           .sort((a, b) => b.docId - a.docId)
           .map((order) => (
             <DashboardCard
-              key={order.id}
+              key={order.objectID}
               icon={<ClipboardList />}
               title={order.vendor}
               subtitle={`PO ${order.docId}`}
-              date={order.createdAt.toDate().toLocaleDateString()}
+              date={new Date(order.createdAt).toLocaleDateString()}
               onOpen={() =>
                 router.push(`/dashboard/purchase-orders/${order.id}`)
               }
@@ -74,32 +121,33 @@ export default function PurchaseOrders() {
           ))}
       </div>
 
+      {/* Wrap filters in a form so Enter triggers submit */}
       <SearchFilters
-        searchDescription={description}
-        setSearchDescription={setDescription}
-        amountRange={amountRange}
-        setAmountRange={setAmountRange}
-        onSearch={search}
+        qDescription={qDescription}
+        qMinAmount={qMinAmount}
+        qMaxAmount={qMaxAmount}
+        qStatus={qStatus}
+        qVendor={qVendor}
+        onDescriptionChange={handleDescriptionChange}
+        onAmountChange={handleAmountChange}
+        onStatusChange={handleStatusChange}
+        onVendorChange={handleVendorChange}
+        onFilterReset={handleFilterReset}
       />
 
       <PurchaseOrdersTable
         orders={orders}
-        sortColumn={sortColumn}
-        sortDirection={sortDirection}
-        onSort={toggleSort}
       />
 
-      {/* <Pagination
-        page={pageIndex}
-        pageSize={pageSize}
-        totalItems={ordersCount || 0}
-        onChange={search}
-        setPage={setPage}
-        setPageSize={(size: number) => {
-          // You may need to update this logic depending on your state management
-          router.push(`/dashboard/purchase-orders?page=1&pageSize=${size}`);
-        }}
-      /> */}
+      <Pagination
+        qPage={qPage}
+        qPageSize={qPageSize}
+        ordersCount={ordersCount}
+        totalCount={totalCount}
+        totalPages={totalPages}
+        onPageChange={handlePageChange}
+        onPageSizeChange={handlePageSizeChange}
+      />
     </div>
   );
 }

@@ -225,31 +225,33 @@ const ServiceReportViewPage = () => {
             {report.contactEmail && <div>{report.contactEmail}</div>}
           </div>
           {/* TODO: Add purchase orders */}
-          <div>
+          <div className="flex flex-col gap-2">
             <div className="font-semibold">Purchase Orders</div>
-            <ListCard
-              icon={<CreditCard className="w-5 h-5" />}
-              name="Purchase Orders"
-              quantity={purchaseOrders.length}
-              onClick={() => {
-                // Navigate to purchase orders page
-                window.location.href = `/dashboard/purchase-orders?srDocId=${report.docId}`;
-              }}
-            />
-            <div className="mt-2">
-              {purchaseOrders.length > 0 ? (
-                purchaseOrders.map(po => (
-                  <div key={po.docId} className="mb-4">
-                    <div>PO {po.docId}</div>
-                    <div className="whitespace-pre-line">
-                      {po.description || "No description provided"}
+            {purchaseOrders.length > 0 ? (
+              <>
+
+                <ListCard
+                  icon={<CreditCard className="w-5 h-5" />}
+                  name="Purchase Orders"
+                  quantity={purchaseOrders.length}
+                  onClick={() => {
+                    window.location.href = `/dashboard/purchase-orders?srDocId=${report.docId}`;
+                  }}
+                />
+                <div className="mt-2">
+                  {purchaseOrders.map((po) => (
+                    <div key={po.docId} className="mb-4">
+                      <div>PO {po.docId}</div>
+                      <div className="whitespace-pre-line">
+                        {po.description || "No description provided"}
+                      </div>
                     </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-muted-foreground">No purchase orders.</div>
-              )}
-            </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="text-muted-foreground">None</div>
+            )}
           </div>
           <div>
             <div className="font-semibold">Additional Materials</div>

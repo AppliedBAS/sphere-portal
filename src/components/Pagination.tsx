@@ -2,38 +2,38 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface PaginationProps {
-  page: number;
-  setPage: (page: number) => void;
-  totalItems: number;
-  pageSize: number;
-  setPageSize: (pageSize: number) => void;
-  onChange: () => void;
+  qPage: number;
+  qPageSize: number;
+  ordersCount: number;
+  totalCount: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
 }
 
 export function Pagination({
-  page,
-  setPage,
-  totalItems,
-  pageSize,
-  setPageSize,
-  onChange
+  qPage,
+  qPageSize,
+  ordersCount,
+  totalCount,
+  totalPages,
+  onPageChange,
+  onPageSizeChange
 }: PaginationProps) {
-  const totalPages = Math.ceil(totalItems / pageSize);
   const pageSizeOptions: number[] = [25, 50, 100, 200];
 
   const handlePageSizeChange = (value: string) => {
-    setPageSize(parseInt(value, 10));
-    onChange();
+    onPageSizeChange(parseInt(value, 10));
   };
 
+  // page is now 1-based
   const handlePageChange = (newPage: number) => {
-    setPage(newPage);
-    onChange();
+    onPageChange(newPage);
   };
 
   const generatePageButtons = () => {
     const buttons = [];
-    const current = page + 1;
+    const current = qPage;
 
     if (current > 2) {
       buttons.push(
@@ -41,7 +41,7 @@ export function Pagination({
           key={1}
           variant={current === 1 ? "default" : "outline"}
           size="sm"
-          onClick={() => handlePageChange(0)}
+          onClick={() => handlePageChange(1)}
         >
           1
         </Button>
@@ -59,7 +59,7 @@ export function Pagination({
           key={current - 1}
           variant="outline"
           size="sm"
-          onClick={() => handlePageChange(current - 2)}
+          onClick={() => handlePageChange(current - 1)}
         >
           {current - 1}
         </Button>
@@ -78,7 +78,7 @@ export function Pagination({
           key={current + 1}
           variant="outline"
           size="sm"
-          onClick={() => handlePageChange(current)}
+          onClick={() => handlePageChange(current + 1)}
         >
           {current + 1}
         </Button>
@@ -96,7 +96,7 @@ export function Pagination({
           key={totalPages}
           variant="outline"
           size="sm"
-          onClick={() => handlePageChange(totalPages - 1)}
+          onClick={() => handlePageChange(totalPages)}
         >
           {totalPages}
         </Button>
@@ -106,17 +106,23 @@ export function Pagination({
     return buttons;
   };
 
-  return (
-    <div className="flex items-center justify-between py-4">
-      <div className="flex items-center space-x-4">
-        <div className="text-sm text-muted-foreground">
-          Showing {Math.min(pageSize, totalItems)} of {totalItems} Orders
-        </div>
-      </div>
+   // Calculate start and end item numbers for display
+   const startItem = ordersCount === 0 ? 0 : (qPageSize * (qPage - 1)) + 1;
+   const endItem = Math.min(qPageSize * qPage, totalCount);
+
+   return (
+     <div className="flex items-center justify-between py-4">
+       <div className="flex items-center space-x-4">
+         <div className="text-sm text-muted-foreground">
+           {ordersCount === 0
+             ? "No rows available"
+             : `Showing ${startItem}-${endItem} of ${totalCount} rows`}
+         </div>
+       </div>
       <div className="space-x-2 flex items-center">
         <div className="flex items-center space-x-2 mr-8">
           <span className="text-sm text-muted-foreground">Show:</span>
-          <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
+          <Select value={qPageSize.toString()} onValueChange={handlePageSizeChange}>
             <SelectTrigger className="w-20 h-8">
               <SelectValue />
             </SelectTrigger>
@@ -132,8 +138,8 @@ export function Pagination({
         <Button
           variant="outline"
           size="sm"
-          disabled={page === 0}
-          onClick={() => handlePageChange(Math.max(page - 1, 0))}
+          disabled={qPage === 1}
+          onClick={() => handlePageChange(Math.max(qPage - 1, 1))}
         >
           Previous
         </Button>
@@ -141,8 +147,8 @@ export function Pagination({
         <Button
           variant="outline"
           size="sm"
-          disabled={page >= totalPages - 1}
-          onClick={() => handlePageChange(Math.min(page + 1, totalPages - 1))}
+          disabled={qPage >= totalPages}
+          onClick={() => handlePageChange(Math.min(qPage + 1, totalPages))}
         >
           Next
         </Button>

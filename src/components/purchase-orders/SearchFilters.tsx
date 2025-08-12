@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, X, ChevronDown } from "lucide-react";
@@ -7,81 +8,116 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
+import { MAX_AMOUNT } from '@/lib/utils';
+import { VendorHit } from '@/models/Vendor';
+import VendorSelect from '../VendorSelect';
+import { toast } from 'sonner';
 
 interface SearchFiltersProps {
-  searchDescription: string;
-  setSearchDescription: (term: string) => void;
-  amountRange: [number, number];
-  setAmountRange: (range: [number, number]) => void;
-  onSearch: () => void;
+  qDescription: string;
+  qMinAmount: number;
+  qMaxAmount: number;
+  qVendor: string;
+  qStatus: string;
+  onDescriptionChange: (val: string) => void;
+  onAmountChange: (minAmount: number, maxAmount: number) => void;
+  onVendorChange: (val: string) => void;
+  onStatusChange: (val: string) => void;
+  onFilterReset: () => void;
 }
 
 export function SearchFilters({
-  searchDescription,
-  setSearchDescription,
-  amountRange,
-  setAmountRange,
-  onSearch
+  qDescription,
+  qMinAmount,
+  qMaxAmount,
+  qVendor,
+  qStatus,
+  onDescriptionChange,
+  onAmountChange,
+  onVendorChange,
+  onStatusChange,
+  onFilterReset
 }: SearchFiltersProps) {
   const [showAmountPopover, setShowAmountPopover] = useState(false);
-  const [pendingAmountRange, setPendingAmountRange] = useState<[number, number]>([0, 100000]);
-
-  const handleSearch = () => {
-    onSearch();
-  };
+  const [minAmount, setMinAmount] = useState<number>(qMinAmount);
+  const [maxAmount, setMaxAmount] = useState<number>(qMaxAmount);
+  const [description, setDescription] = useState<string>(qDescription);
+  const vendor: VendorHit | null = qVendor ? {
+    objectID: "",
+    name: qVendor,
+    active: true,
+    id: "",
+  } : null;
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleSearch();
+      onDescriptionChange(description);
     }
   }; 
 
   const handleAmountReset = () => {
-    setPendingAmountRange([0, 100000]);
-    setShowAmountPopover(false);
-    onSearch();
+    onAmountChange(0, MAX_AMOUNT);
   };
 
   const handleAmountConfirm = () => {
-    setAmountRange(pendingAmountRange);
-    setShowAmountPopover(false);
-    onSearch();
+    if (minAmount < 0 || maxAmount > MAX_AMOUNT) {
+      toast.error(`Please enter a valid amount range (0 - ${MAX_AMOUNT})`);
+      return;
+    }
+    onAmountChange(minAmount, maxAmount);
   };
 
-  const hasActiveFilters = searchDescription.trim() !== "" ||
-    (amountRange[0] !== 0 || amountRange[1] !== 100000);
+  const handleDescriptionSubmit = () => {
+    onDescriptionChange(description);
+  };
+
+  const handleVendorChange = (vendor: VendorHit | null) => {
+    onVendorChange(vendor?.name ?? "");
+  };
+
+  const hasActiveFilters = qDescription !== "" ||
+    (qMinAmount !== 0 || qMaxAmount !== MAX_AMOUNT) || qVendor !== "" || qStatus !== "";
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 mb-4">
       {/* Search Input with Button */}
-      <div className="relative flex items-center max-w-sm">
+      <div className="relative flex items-center w-96">
         <Input
           placeholder="Search by description"
-          value={searchDescription}
+          value={description}
           type='search'
-          onChange={(e) => setSearchDescription(e.currentTarget.value)}
+          onChange={(e) => setDescription(e.currentTarget.value)}
           onKeyDown={handleKeyPress}
           className="text-foreground"
         />
       </div>
+
+      {/* Search Button */}
+      <Button
+        variant="default"
+        size="sm"
+        onClick={handleDescriptionSubmit}
+        className="flex items-center gap-1"
+      >
+        <Search className="h-4 w-4" />
+      </Button>
 
       {/* Amount Range Filter */}
       <Popover
         open={showAmountPopover}
         onOpenChange={(open) => {
           setShowAmountPopover(open);
-          if (open) setPendingAmountRange(amountRange);
+          if (open) setMinAmount(minAmount);
+          if (open) setMaxAmount(maxAmount);
         }}
       >
         <PopoverTrigger asChild>
           <Button
             variant="outline"
             size="sm"
-            className={hasActiveFilters && (amountRange[0] !== 0 || amountRange[1] !== 100000) ?
-              "border-primary bg-blue-50" : ""}
           >
-            {amountRange[0] !== 0 || amountRange[1] !== 100000
-              ? `Amount: $${amountRange[0].toLocaleString()} - $${amountRange[1].toLocaleString()}`
+            {qMinAmount !== 0 || qMaxAmount !== MAX_AMOUNT
+              ? `Amount: $${qMinAmount.toLocaleString()} - $${qMaxAmount.toLocaleString()}`
               : "Amount"}
             <ChevronDown className="h-4 w-4 ml-1" />
           </Button>
@@ -93,17 +129,13 @@ export function SearchFilters({
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
-              value={pendingAmountRange[0] === 0 ? "" : pendingAmountRange[0]}
+              value={minAmount === 0 ? "" : minAmount}
               onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9]/g, "");
-                if (val === "") {
-                  setPendingAmountRange([0, pendingAmountRange[1]]);
+                if (e.target.value === "") {
+                  setMinAmount(0);
                 } else {
-                  const num = Number(val);
-                  setPendingAmountRange([
-                    num,
-                    pendingAmountRange[1] < num ? num : pendingAmountRange[1],
-                  ]);
+                  const num = Number(e.target.value);
+                  setMinAmount(num);
                 }
               }}
               className="w-20 text-xs"
@@ -114,17 +146,13 @@ export function SearchFilters({
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
-              value={pendingAmountRange[1] === 100000 ? "" : pendingAmountRange[1]}
+              value={maxAmount === MAX_AMOUNT ? "" : maxAmount}
               onChange={(e) => {
-                const val = e.target.value.replace(/[^0-9]/g, "");
-                if (val === "") {
-                  setPendingAmountRange([pendingAmountRange[0], Infinity]);
+                if (e.target.value === "") {
+                  setMaxAmount(MAX_AMOUNT);
                 } else {
-                  const num = Number(val);
-                  setPendingAmountRange([
-                    pendingAmountRange[0] > num ? pendingAmountRange[0] : pendingAmountRange[0],
-                    num,
-                  ]);
+                  const num = Number(e.target.value);
+                  setMaxAmount(num);
                 }
               }}
               className="w-20 text-xs"
@@ -149,27 +177,27 @@ export function SearchFilters({
           </div>
         </PopoverContent>
       </Popover>
-
-      {/* Search Button */}
-      <Button
-        variant="default"
-        size="sm"
-        onClick={handleSearch}
-        className="flex items-center gap-1"
-      >
-        <Search className="h-4 w-4" />
-      </Button>
+      {/* Vendor Filter */}
+      <div className="w-32">
+        <VendorSelect selectedVendor={vendor} setSelectedVendor={handleVendorChange} placeholder="Vendor" />
+      </div>
+      {/* Status Filter */}
+      <Select value={qStatus.toLowerCase()} onValueChange={onStatusChange}>
+        <SelectTrigger className="w-28 h-8">
+          <SelectValue placeholder="Status" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="open">Open</SelectItem>
+          <SelectItem value="closed">Closed</SelectItem>
+        </SelectContent>
+      </Select>
 
       {/* Clear All Filters Button - only show when there are active filters */}
       {hasActiveFilters && (
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => {
-            setSearchDescription("");
-            setAmountRange([0, 100000]);
-            onSearch();
-          }}
+          onClick={onFilterReset}
           className="flex items-center gap-1"
         >
           <X className="h-4 w-4" />
