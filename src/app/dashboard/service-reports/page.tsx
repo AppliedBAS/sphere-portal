@@ -1,37 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { firestore } from "@/lib/firebase";
-import {
-  collection,
-  getDocs,
-  Timestamp,
-} from "firebase/firestore";
-import { ServiceReport } from "@/models/ServiceReport";
 import { useRouter } from "next/navigation";
 import { DashboardCard } from "@/components/DashboardCard";
 import { ClipboardList } from "lucide-react";
-
-import {
-  Table,
-  TableHeader,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableCell,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { ChevronUp, ChevronDown, MoreHorizontal } from "lucide-react";
-
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -40,115 +12,68 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { ServiceReportsTable } from "@/components/service-reports/ServiceReportsTable";
+import { ServiceReportsSearchFilters } from "@/components/service-reports/SearchFilters";
+import { Pagination } from "@/components/Pagination";
+import { useServiceReports } from "@/hooks/useServiceReports";
 
 export default function ServiceReports() {
   const router = useRouter();
-  const [reports, setReports] = useState<ServiceReport[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    reports,
+    loading,
+    reportsCount,
+    totalCount,
+    totalPages,
+    qSearch,
+    qDraft,
+    qRemote,
+    qWarranty,
+    qPage,
+    qPageSize
+  } = useServiceReports();
 
-  // --- Table state ---
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortColumn, setSortColumn] = useState<
-    "clientName" | "serviceAddress" | "createdAt" | "docId"
-  >("docId");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const [pageIndex, setPageIndex] = useState(0);
-  const pageSize = 25;
-
-  useEffect(() => {
-    async function fetchReports() {
-      setLoading(true);
-      const querySnapshot = await getDocs(collection(firestore, "reports"));
-      // Use the FirestoreDataConverter for each doc
-      const { serviceReportConverter } = await import("@/models/ServiceReport");
-      const data = querySnapshot.docs.map((doc) =>
-        serviceReportConverter.fromFirestore(doc)
-      );
-      setReports(data);
-      setLoading(false);
-    }
-
-    fetchReports();
-  }, []);
-
-  // 1) Filter by searchTerm (clientName or serviceAddress1)
-  const filtered = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    if (!term) return reports;
-    return reports.filter((r) => {
-      return (
-        r.clientName.toLowerCase().includes(term) ||
-        r.serviceAddress1.toLowerCase().includes(term) ||
-        r.cityStateZip.toLowerCase().includes(term)
-      );
-    });
-  }, [reports, searchTerm]);
-
-  // 2) Sort by selected column & direction
-  const sorted = useMemo(() => {
-    return [...filtered].sort((a, b) => {
-      let aVal: string | number = "";
-      let bVal: string | number = "";
-
-      if (sortColumn === "clientName") {
-        aVal = a.clientName.toLowerCase();
-        bVal = b.clientName.toLowerCase();
-      } else if (sortColumn === "serviceAddress") {
-        aVal = a.serviceAddress1.toLowerCase();
-        bVal = b.serviceAddress1.toLowerCase();
-      } else if (sortColumn === "docId") {
-        aVal = a.docId;
-        bVal = b.docId;
-      } else {
-        // createdAt
-        aVal = a.createdAt.toMillis();
-        bVal = b.createdAt.toMillis();
-      }
-
-      if (aVal < bVal) {
-        return sortDirection === "asc" ? -1 : 1;
-      }
-      if (aVal > bVal) {
-        return sortDirection === "asc" ? 1 : -1;
-      }
-      return 0;
-    });
-  }, [filtered, sortColumn, sortDirection]);
-
-  // 3) Split into drafts first, then published
-  const withStatusOrder = useMemo(() => {
-    const drafts = sorted.filter((r) => r.draft);
-    const published = sorted.filter((r) => !r.draft);
-    return [...drafts, ...published];
-  }, [sorted]);
-
-  // 4) Paginate
-  const pageCount = Math.ceil(withStatusOrder.length / pageSize);
-  const paginated = useMemo(() => {
-    const start = pageIndex * pageSize;
-    return withStatusOrder.slice(start, start + pageSize);
-  }, [withStatusOrder, pageIndex]);
-
-  // Sort for mobile: docId greatest to lowest
-  const mobileReports = useMemo(
-    () => [...reports].sort((a, b) => b.docId - a.docId),
-    [reports]
-  );
-
-  // Helper to format Firestore Timestamp
-  const formatDate = (ts: Timestamp) => ts.toDate().toLocaleString();
-
-  const toggleSort = (
-    column: "clientName" | "serviceAddress" | "createdAt" | "docId"
-  ) => {
-    if (sortColumn === column) {
-      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortColumn(column);
-      setSortDirection("asc");
-    }
-    setPageIndex(0); // reset to first page when sorting changes
+  // Handlers for filters (these should update the URL, which triggers the hook)
+  const handleSearchChange = (val: string) => {
+    const params = new URLSearchParams(window.location.search);
+    if (val) params.set("q", val); else params.delete("q");
+    window.location.search = params.toString();
   };
+  const handleDraftChange = (val: string) => {
+    const params = new URLSearchParams(window.location.search);
+    if (val) params.set("draft", val); else params.delete("draft");
+    window.location.search = params.toString();
+  };
+  // const handleRemoteChange = (val: string) => {
+  //   const params = new URLSearchParams(window.location.search);
+  //   if (val) params.set("remote", val); else params.delete("remote");
+  //   window.location.search = params.toString();
+  // };
+  const handleAmountRangeChange = (range: [number, number]) => {
+    const params = new URLSearchParams(window.location.search);
+    params.set("minAmount", range[0].toString());
+    params.set("maxAmount", range[1].toString());
+    window.location.search = params.toString();
+  };
+  const handleWarrantyChange = (val: string) => {
+    const params = new URLSearchParams(window.location.search);
+    if (val) params.set("warranty", val); else params.delete("warranty");
+    window.location.search = params.toString();
+  };
+  const handleFilterReset = () => {
+    window.location.search = "";
+  };
+  const handlePageChange = (page: number) => {
+    const params = new URLSearchParams(window.location.search);
+    params.set("page", page.toString());
+    window.location.search = params.toString();
+  };
+  const handlePageSizeChange = (size: number) => {
+    const params = new URLSearchParams(window.location.search);
+    params.set("pageSize", size.toString());
+    window.location.search = params.toString();
+  };
+
 
   if (loading) {
     return <div>Loading...</div>;
@@ -172,205 +97,48 @@ export default function ServiceReports() {
       </Breadcrumb>
       <h1 className="text-2xl font-bold">Service Reports</h1>
 
+      {/* Mobile view */}
       <div className="grid grid-cols-1 gap-4 md:hidden">
-        {mobileReports.map((report) => (
+        {reports.map((report) => (
           <DashboardCard
-            key={report.id}
+            key={report.objectID}
             icon={<ClipboardList />}
             title={report.clientName}
             subtitle={`SR ${report.docId}`}
-            date={report.createdAt.toDate().toLocaleDateString()}
+            date={new Date(report.createdAt).toLocaleDateString()}
             onOpen={() =>
-              router.push(`/dashboard/service-reports/${report.id}`)
+              router.push(`/dashboard/service-reports/${report.objectID}`)
             }
           />
         ))}
       </div>
-      <div className="hidden md:block">
-        {/* Search Input */}
-        <div className="flex items-center gap-2">
-          <Input
-            placeholder="Search by client or service address…"
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.currentTarget.value);
-              setPageIndex(0);
-            }}
-            className="max-w-sm"
-          />
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              setSearchTerm("");
-              setPageIndex(0);
-            }}
-          >
-            Clear
-          </Button>
-        </div>
 
-        {/* Table */}
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead
-                className="w-20 cursor-pointer"
-                onClick={() => toggleSort("docId")}
-              >
-                <div className="flex items-center">
-                  Doc&nbsp;ID
-                  {sortColumn === "docId" &&
-                    (sortDirection === "asc" ? (
-                      <ChevronUp className="h-4 w-4 ml-1" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4 ml-1" />
-                    ))}
-                </div>
-              </TableHead>
-              <TableHead
-                className="cursor-pointer"
-                onClick={() => toggleSort("clientName")}
-              >
-                <div className="flex items-center">
-                  Client
-                  {sortColumn === "clientName" &&
-                    (sortDirection === "asc" ? (
-                      <ChevronUp className="h-4 w-4 ml-1" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4 ml-1" />
-                    ))}
-                </div>
-              </TableHead>
-              <TableHead
-                className="cursor-pointer"
-                onClick={() => toggleSort("serviceAddress")}
-              >
-                <div className="flex items-center">
-                  Service Address
-                  {sortColumn === "serviceAddress" &&
-                    (sortDirection === "asc" ? (
-                      <ChevronUp className="h-4 w-4 ml-1" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4 ml-1" />
-                    ))}
-                </div>
-              </TableHead>
-              <TableHead>Contact</TableHead>
-              <TableHead
-                className="cursor-pointer"
-                onClick={() => toggleSort("createdAt")}
-              >
-                <div className="flex items-center">
-                  Created At
-                  {sortColumn === "createdAt" &&
-                    (sortDirection === "asc" ? (
-                      <ChevronUp className="h-4 w-4 ml-1" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4 ml-1" />
-                    ))}
-                </div>
-              </TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
+      <ServiceReportsSearchFilters
+        qSearch={qSearch}
+        qAmountRange={[0, 100000]}
+        qDraft={qDraft}
+        qRemote={qRemote}
+        qWarranty={qWarranty}
+        onSearchChange={handleSearchChange}
+        onAmountRangeChange={handleAmountRangeChange}
+        onDraftChange={handleDraftChange}
+        onWarrantyChange={handleWarrantyChange}
+        onFilterReset={handleFilterReset}
+      />
 
-          <TableBody>
-            {paginated.map((report) => (
-              <TableRow key={report.id}>
-                <TableCell>{report.docId}</TableCell>
-                <TableCell>{report.clientName}</TableCell>
-                <TableCell className="max-w-xs truncate">
-                  {report.serviceAddress1}
-                  {report.serviceAddress2 ? `, ${report.serviceAddress2}` : ""}
-                  <br />
-                  <span className="text-sm text-muted-foreground">
-                    {report.cityStateZip}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  {report.contactName}
-                  <br />
-                  <span className="text-sm text-muted-foreground">
-                    {report.contactPhone}
-                  </span>
-                </TableCell>
-                <TableCell>{formatDate(report.createdAt)}</TableCell>
-                <TableCell>
-                  {report.draft ? (
-                    <Badge
-                      variant="outline"
-                      className="text-yellow-800 border-yellow-300 bg-yellow-50"
-                    >
-                      Draft
-                    </Badge>
-                  ) : (
-                    <Badge
-                      variant="outline"
-                      className="text-green-800 border-green-300 bg-green-50"
-                    >
-                      Submitted
-                    </Badge>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {report.draft && (
-                        <DropdownMenuItem asChild>
-                          <Link
-                            href={`/dashboard/service-reports/${report.id}/edit`}
-                          >
-                            Edit
-                          </Link>
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem asChild>
-                        <Link href={`/dashboard/service-reports/${report.id}`}>
-                          View
-                        </Link>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      <ServiceReportsTable
+        reports={reports}
+      />
 
-        {/* Pagination Controls */}
-        <div className="flex items-center justify-between py-4">
-          <div className="text-sm text-gray-600">
-            Page {pageIndex + 1} of {pageCount}
-          </div>
-          <div className="space-x-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={pageIndex === 0}
-              onClick={() => setPageIndex((i) => Math.max(i - 1, 0))}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={pageIndex + 1 >= pageCount}
-              onClick={() =>
-                setPageIndex((i) => Math.min(i + 1, pageCount - 1))
-              }
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      </div>
+      <Pagination
+        qPage={qPage}
+        qPageSize={qPageSize}
+        ordersCount={reportsCount}
+        totalCount={totalCount}
+        totalPages={totalPages}
+        onPageChange={handlePageChange}
+        onPageSizeChange={handlePageSizeChange}
+      />
     </div>
   );
 }
