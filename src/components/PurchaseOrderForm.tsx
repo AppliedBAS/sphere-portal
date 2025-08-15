@@ -1,6 +1,12 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { Attachment, PurchaseOrder, purchaseOrderConverter, PurchaseOrderMessage } from "@/models/PurchaseOrder";
+import { getStorage, ref, uploadBytes, UploadResult } from "firebase/storage";
+import {
+  Attachment,
+  PurchaseOrder,
+  purchaseOrderConverter,
+  PurchaseOrderMessage,
+} from "@/models/PurchaseOrder";
 import { Input } from "@/components/ui/input";
 import { Project, ProjectHit } from "@/models/Project";
 import { Button } from "@/components/ui/button";
@@ -13,7 +19,15 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { Loader2 } from "lucide-react";
-import { collection, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  where,
+} from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
 import { toast } from "sonner";
 import VendorSelect from "./VendorSelect";
@@ -48,8 +62,11 @@ export default function PurchaseOrderForm({
     purchaseOrder.otherCategory || ""
   );
   const [serviceReports, setServiceReports] = useState<ServiceReport[]>([]);
-  const [selectedProject, setSelectedProject] = useState<ProjectHit | null>(null);
-  const [selectedServiceReport, setSelectedServiceReport] = useState<ServiceReport | null>(null);
+  const [selectedProject, setSelectedProject] = useState<ProjectHit | null>(
+    null
+  );
+  const [selectedServiceReport, setSelectedServiceReport] =
+    useState<ServiceReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [submittedOrderId, setSubmittedOrderId] = useState<string | null>(null);
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
@@ -60,80 +77,126 @@ export default function PurchaseOrderForm({
   >(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
-  const canSubmit: boolean = !!description && !!amount && !!vendor && (
-    (categoryType === "project" && !!selectedProject) ||
-    (categoryType === "service" && !!selectedServiceReport) ||
-    (categoryType === "other" && !!otherCategory)
-  );
+  const canSubmit: boolean =
+    !!description &&
+    !!amount &&
+    !!vendor &&
+    ((categoryType === "project" && !!selectedProject) ||
+      (categoryType === "service" && !!selectedServiceReport) ||
+      (categoryType === "other" && !!otherCategory));
+
+  // Upload receipt file to Firebase Storage
+  const uploadReceipts = async (files: File[]): Promise<UploadResult[]> => {
+    const storage = getStorage();
+    const folder = `po-${purchaseOrder.docId!}`;
+    const uploadPromises = files.map((file, index) => {
+      const ext = file.type.split("/")[1] || "file";
+      const fileName = `attachment_${index}.${ext}`;
+      const storageRef = ref(storage, `receipts/${folder}/${fileName}`);
+      return uploadBytes(storageRef, file);
+    });
+    return Promise.all(uploadPromises);
+  }
+
+  const buildAttachments = async (files: File[]): Promise<Attachment[]> => {
+    const promises = files.map(
+      (file) =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result;
+            if (typeof result === "string") {
+              // Remove the data:*;base64, prefix, leave only the base64 value
+              const base64 = result.split(",")[1] ?? "";
+              resolve(base64);
+            } else {
+              reject(new Error("FileReader result is not a string"));
+            }
+          };
+          reader.onerror = (e) => reject(e);
+          reader.readAsDataURL(file);
+        })
+    );
+    const results = await Promise.allSettled(promises);
+    const attachments: Attachment[] = [];
+    results.forEach((result, idx) => {
+      if (result.status === "fulfilled") {
+        attachments.push({
+          type: files[idx].type,
+          content: result.value, // base64 only, no data: prefix
+        });
+      }
+    });
+    return attachments;
+  };
 
   useEffect(() => {
     async function initForm() {
-    if (!purchaseOrder) return;
+      if (!purchaseOrder) return;
 
-    setLoading(true);
-    
-    if (purchaseOrder.vendor) {
-      const vendorData: Vendor | null = await fetchVendorByName(
-        purchaseOrder.vendor
-      );
+      setLoading(true);
 
-      if (vendorData) {
-        setVendor({
-          objectID: vendorData.id,
-          name: vendorData.name,
-          active: vendorData.active,
-          id: vendorData.id,
-        });
+      if (purchaseOrder.vendor) {
+        const vendorData: Vendor | null = await fetchVendorByName(
+          purchaseOrder.vendor
+        );
+
+        if (vendorData) {
+          setVendor({
+            objectID: vendorData.id,
+            name: vendorData.name,
+            active: vendorData.active,
+            id: vendorData.id,
+          });
+        }
       }
-    }
 
-    if (purchaseOrder.technicianRef) {
-      const empSnap = await getDoc(
-        purchaseOrder.technicianRef.withConverter(employeeConverter)
-      );
-      if (empSnap.exists()) {
-        const emp = empSnap.data() as Employee;
-        setTechnician(emp);
+      if (purchaseOrder.technicianRef) {
+        const empSnap = await getDoc(
+          purchaseOrder.technicianRef.withConverter(employeeConverter)
+        );
+        if (empSnap.exists()) {
+          const emp = empSnap.data() as Employee;
+          setTechnician(emp);
+        }
       }
-    }
 
-    const draftSR = await fetchDraftServiceReports();
+      const draftSR = await fetchDraftServiceReports();
 
-    if (purchaseOrder.projectDocId) {
-      // Fetch the project by docId
-      const q = query(
-        collection(firestore, "projects"),
-        where("doc-id", "==", purchaseOrder.projectDocId)
-      );
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        const proj = snap.docs[0].data() as Project;
-        setSelectedProject({
-          objectID: snap.docs[0].id,
-          docId: proj.docId,
-          client: proj.client,
-          description: proj.description,
-          location: proj.location,
-        });
+      if (purchaseOrder.projectDocId) {
+        // Fetch the project by docId
+        const q = query(
+          collection(firestore, "projects"),
+          where("doc-id", "==", purchaseOrder.projectDocId)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const proj = snap.docs[0].data() as Project;
+          setSelectedProject({
+            objectID: snap.docs[0].id,
+            docId: proj.docId,
+            client: proj.client,
+            description: proj.description,
+            location: proj.location,
+          });
+        }
+        setCategoryType("project");
+      } else if (purchaseOrder.serviceReportDocId) {
+        const serviceReport = draftSR.find(
+          (r) => r.docId === purchaseOrder.serviceReportDocId
+        );
+        setSelectedServiceReport(serviceReport || null);
+        setCategoryType("service");
+      } else if (purchaseOrder.otherCategory) {
+        setOtherCategory(purchaseOrder.otherCategory);
+        setCategoryType("other");
+      } else {
+        setCategoryType("other");
       }
-      setCategoryType("project");
-    } else if (purchaseOrder.serviceReportDocId) {
-      const serviceReport = draftSR.find(
-        (r) => r.docId === purchaseOrder.serviceReportDocId
-      );
-      setSelectedServiceReport(serviceReport || null);
-      setCategoryType("service");
-    } else if (purchaseOrder.otherCategory) {
-      setOtherCategory(purchaseOrder.otherCategory);
-      setCategoryType("other");
-    } else {
-      setCategoryType("other");
+      setServiceReports(draftSR);
+      setLoading(false);
     }
-    setServiceReports(draftSR);
-    setLoading(false);
-  }
     initForm();
-    
   }, [purchaseOrder]);
 
   // Only show the input for the selected category, set others to null
@@ -153,8 +216,14 @@ export default function PurchaseOrderForm({
   const handleFiles = (files: FileList | null) => {
     if (!files) return;
     const allowedTypes = [
-      'image/jpeg', 'image/png', 'application/pdf', 'image/heic', 'image/heif',
-      'image/tiff', 'image/bmp', 'image/gif',
+      "image/jpeg",
+      "image/png",
+      "application/pdf",
+      "image/heic",
+      "image/heif",
+      "image/tiff",
+      "image/bmp",
+      "image/gif",
     ];
     const newFilesArr = Array.from(files);
     const filteredFiles = newFilesArr.filter((file) => {
@@ -167,7 +236,8 @@ export default function PurchaseOrderForm({
     setSelectedFiles((prev) => {
       const prevArr = prev || [];
       const uniqueFiles = filteredFiles.filter(
-        (file) => !prevArr.some(f => f.name === file.name && f.size === file.size)
+        (file) =>
+          !prevArr.some((f) => f.name === file.name && f.size === file.size)
       );
       return [...prevArr, ...uniqueFiles];
     });
@@ -188,7 +258,9 @@ export default function PurchaseOrderForm({
         id: purchaseOrder.id,
         otherCategory: otherCategory || null,
         projectDocId: selectedProject ? selectedProject.docId : null,
-        serviceReportDocId: selectedServiceReport ? Number(selectedServiceReport.docId) : null,
+        serviceReportDocId: selectedServiceReport
+          ? Number(selectedServiceReport.docId)
+          : null,
         status: "OPEN",
         technicianRef: purchaseOrder.technicianRef,
         vendor: vendor ? vendor.name : "",
@@ -224,40 +296,15 @@ export default function PurchaseOrderForm({
         `${currentEmployee.clientId}:${currentEmployee.clientSecret}`
       );
       const authorizationHeader = `Bearer ${token}`;
-      // Convert files to base64 for attachments (keep data: prefix)
-      const buildAttachments = async (files: File[]): Promise<Attachment[]> => {
-        const promises = files.map(
-          (file) =>
-            new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => {
-                const result = reader.result;
-                if (typeof result === "string") {
-                  // Remove the data:*;base64, prefix, leave only the base64 value
-                  const base64 = result.split(",")[1] ?? "";
-                  resolve(base64);
-                } else {
-                  reject(new Error("FileReader result is not a string"));
-                }
-              };
-              reader.onerror = (e) => reject(e);
-              reader.readAsDataURL(file);
-            })
-        );
-        const results = await Promise.allSettled(promises);
-        const attachments: Attachment[] = [];
-        results.forEach((result, idx) => {
-          if (result.status === "fulfilled") {
-            attachments.push({
-              type: files[idx].type,
-              content: result.value, // base64 only, no data: prefix
-            });
-          }
-        });
-        return attachments;
-      };
 
-      const attachments = selectedFiles.length > 0 ? await buildAttachments(selectedFiles) : [];
+      const uploadPaths: UploadResult[] = await uploadReceipts(selectedFiles);
+      if (uploadPaths.length < selectedFiles.length) {
+        toast.error("Failed to upload receipts. Please try again.");
+        return;
+      }
+      // Convert files to base64 for attachments (keep data: prefix)
+      const attachments =
+        selectedFiles.length > 0 ? await buildAttachments(selectedFiles) : [];
 
       const message: PurchaseOrderMessage = {
         amount: amount,
@@ -301,7 +348,9 @@ export default function PurchaseOrderForm({
       const result = await res.json();
       if (!res.ok) throw new Error(result.message || "Error sending report");
 
-      const orderRef = doc(firestore, "orders", purchaseOrder.id).withConverter(purchaseOrderConverter);
+      const orderRef = doc(firestore, "orders", purchaseOrder.id).withConverter(
+        purchaseOrderConverter
+      );
       const data: PurchaseOrder = {
         amount: amount,
         createdAt: purchaseOrder.createdAt,
@@ -310,7 +359,9 @@ export default function PurchaseOrderForm({
         id: purchaseOrder.id,
         otherCategory: otherCategory || null,
         projectDocId: selectedProject ? selectedProject.docId : null,
-        serviceReportDocId: selectedServiceReport ? Number(selectedServiceReport.docId) : null,
+        serviceReportDocId: selectedServiceReport
+          ? Number(selectedServiceReport.docId)
+          : null,
         status: "CLOSED",
         technicianRef: purchaseOrder.technicianRef,
         vendor: vendor ? vendor.name : "",
@@ -355,9 +406,7 @@ export default function PurchaseOrderForm({
           <DialogHeader>
             <DialogTitle>Order Submitted</DialogTitle>
           </DialogHeader>
-          <div className="py-4">
-            Your purchase order was sent successfully.
-          </div>
+          <div className="py-4">Your purchase order was sent successfully.</div>
           <DialogFooter>
             <Button onClick={handleCloseDialog}>Close</Button>
           </DialogFooter>
@@ -469,12 +518,12 @@ export default function PurchaseOrderForm({
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="receipts">Receipts</Label>
-            <FileSelectButton
+          <FileSelectButton
             onFilesSelected={handleFiles}
             multiple
             accept=".jpg,.jpeg,.png,.pdf,.heic,.heif,.tiff,.bmp,.gif"
             label="Upload Files"
-            />
+          />
           {selectedFiles.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
               {selectedFiles.map((file, idx) => (
@@ -489,7 +538,9 @@ export default function PurchaseOrderForm({
                     className="ml-2 text-muted-foreground hover:text-destructive focus:outline-none"
                     aria-label={`Remove ${file.name}`}
                     onClick={() => {
-                      setSelectedFiles((prev) => prev.filter((_, i) => i !== idx));
+                      setSelectedFiles((prev) =>
+                        prev.filter((_, i) => i !== idx)
+                      );
                     }}
                   >
                     &times;
