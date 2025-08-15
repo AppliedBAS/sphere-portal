@@ -78,7 +78,7 @@ interface ServiceNoteInput {
   technicianOvertime: string;
   helperTime: string;
   helperOvertime: string;
-  remoteWork: string; // 'yes' or ''
+  remoteWork: string;
   notes: string;
 }
 

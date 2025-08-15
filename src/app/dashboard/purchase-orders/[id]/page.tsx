@@ -18,6 +18,8 @@ import {
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Pencil } from "lucide-react";
+import { listReceiptFiles } from "@/lib/storage";
+import { FileText } from "lucide-react";
 
 const PurchaseOrderDetailPage = () => {
   const params = useParams();
@@ -25,6 +27,7 @@ const PurchaseOrderDetailPage = () => {
   const [order, setOrder] = useState<PurchaseOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [technician, setTechnician] = useState<Employee | null>(null);
+  const [receipts, setReceipts] = useState<{ name: string; type: string; url: string }[]>([]);
 
   useEffect(() => {
     async function fetchOrder() {
@@ -40,6 +43,9 @@ const PurchaseOrderDetailPage = () => {
           const techSnap = await getDoc(data.technicianRef.withConverter(employeeConverter));
           setTechnician(techSnap.exists() ? techSnap.data() : null);
         }
+        // Fetch receipts
+        const files = await listReceiptFiles(`po-${data.docId}`);
+        setReceipts(files);
       }
       setLoading(false);
     }
@@ -151,6 +157,29 @@ const PurchaseOrderDetailPage = () => {
                 ? order.createdAt.toDate().toLocaleString()
                 : ""}
             </div>
+          </div>
+          <div>
+            <div className="font-semibold mb-2">Receipts</div>
+            {receipts.length > 0 ? (
+              <ul className="space-y-2">
+                {receipts.map((file) => (
+                  <li key={file.url} className="flex items-center space-x-2">
+                    <FileText className="w-4 h-4 text-muted-foreground" />
+                    <a
+                      href={file.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      {file.name}
+                    </a>
+                    <span className="text-xs text-muted-foreground">({file.type})</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <span className="text-muted-foreground">No receipts available.</span>
+            )}
           </div>
         </Card>
       </div>
