@@ -8,7 +8,7 @@ import {
   PurchaseOrderMessage,
 } from "@/models/PurchaseOrder";
 import { Input } from "@/components/ui/input";
-import { Project, ProjectHit } from "@/models/Project";
+import { Project, projectConverter, ProjectHit } from "@/models/Project";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -166,7 +166,7 @@ export default function PurchaseOrderForm({
       if (purchaseOrder.projectDocId) {
         // Fetch the project by docId
         const q = query(
-          collection(firestore, "projects"),
+          collection(firestore, "projects").withConverter(projectConverter),
           where("doc-id", "==", purchaseOrder.projectDocId)
         );
         const snap = await getDocs(q);
