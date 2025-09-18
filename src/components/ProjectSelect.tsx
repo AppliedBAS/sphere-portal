@@ -56,7 +56,13 @@ export default function ProjectSelect({
         try {
           const { hits } = await client.searchSingleIndex({
             indexName: "projects",
-            searchParams: { query: q, hitsPerPage: 10 },
+            // Only return projects where the facet `active` is true
+            searchParams: {
+              query: q,
+              hitsPerPage: 10,
+              facets: ["active"],
+              facetFilters: ["active:true"],
+            },
           });
           setHits(
             hits
@@ -66,6 +72,13 @@ export default function ProjectSelect({
                 client: String(hit.client),
                 description: String(hit.description),
                 location: String(hit.location),
+                active: Boolean(hit.active),
+                balance: typeof hit.balance === "number" ? hit.balance : 0,
+                createdAt: typeof hit["created-at"] === "string"
+                  ? hit["created-at"]
+                  : (hit["created-at"] instanceof Date
+                      ? hit["created-at"].toISOString()
+                      : new Date().toISOString()),
               }))
               .sort((a, b) => (b.docId ?? 0) - (a.docId ?? 0))
           );

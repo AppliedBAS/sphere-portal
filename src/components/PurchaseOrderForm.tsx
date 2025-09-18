@@ -178,6 +178,9 @@ export default function PurchaseOrderForm({
             client: proj.client,
             description: proj.description,
             location: proj.location,
+            active: proj.active,
+            balance: proj.balance ?? 0,
+            createdAt: proj.createdAt ? proj.createdAt.toDate().toISOString() : "",
           });
         }
         setCategoryType("project");

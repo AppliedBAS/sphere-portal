@@ -6,7 +6,7 @@ export default function ProjectsLayout({
     children: React.ReactNode;
 }) {
     return (
-        <div className="min-h-screen px-8">
+        <div>
             {children}
         </div>
     );

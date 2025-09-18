@@ -19,6 +19,9 @@ export interface ProjectHit {
   client: string;
   description: string;
   location: string;
+  active: boolean;
+  balance: number;
+  createdAt: string; // ISO string from Firestore
 }
 
 export const projectConverter: FirestoreDataConverter<Project> = {

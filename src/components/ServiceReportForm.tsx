@@ -392,9 +392,9 @@ export default function ServiceReportForm({
         return;
       }
       const response = await openAIClient.responses.create({
-        model: "gpt-4.1-mini",
+        model: "gpt-5-mini",
         instructions:
-          "Rephrase the service note for clarity and professionalism.",
+          "Rephrase the service note to sound casual yet professional and clear.",
         input: noteToRephrase,
       });
 

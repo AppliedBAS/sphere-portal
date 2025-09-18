@@ -106,6 +106,9 @@ export default function ProjectReportForm({
             client: data.client,
             description: data.description,
             location: data.location,
+            active: data.active ?? true,
+            balance: data.balance ?? 0,
+            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
           });
         }
       }
@@ -486,9 +489,9 @@ export default function ProjectReportForm({
     setRephraseDialogOpen(true);
     try {
       const response = await openAIClient.responses.create({
-        model: "gpt-4.1-mini",
+        model: "gpt-5-mini",
         instructions:
-          "Rephrase the project report notes for clarity and professionalism.",
+          "Rephrase the project report notes to sound casual yet professional and clear.",
         input: notes,
       });
       setRephrase(response.output_text ?? "");
