@@ -56,7 +56,9 @@ export default function PurchaseOrderForm({
   const [description, setDescription] = useState(
     purchaseOrder.description || ""
   );
-  const [amount, setAmount] = useState(purchaseOrder.amount || 0);
+  const [amount, setAmount] = useState<string>(
+    purchaseOrder.amount?.toString() || ""
+  );
   const [vendor, setVendor] = useState<VendorHit | null>(null);
   const [otherCategory, setOtherCategory] = useState(
     purchaseOrder.otherCategory || ""
@@ -72,30 +74,63 @@ export default function PurchaseOrderForm({
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string>("");
   const [categoryType, setCategoryType] = useState<
     "other" | "project" | "service" | null
   >(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
+
+  const getAmountAsNumber = (): number => {
+    const parsed = parseFloat(amount);
+    return isNaN(parsed) ? 0 : parsed;
+  };
 
   const canSubmit: boolean =
     !!description &&
     !!amount &&
+    !isNaN(parseFloat(amount)) &&
+    parseFloat(amount) > 0 &&
     !!vendor &&
     ((categoryType === "project" && !!selectedProject) ||
       (categoryType === "service" && !!selectedServiceReport) ||
-      (categoryType === "other" && !!otherCategory));
+      (categoryType === "other" && !!otherCategory)) &&
+    uploadErrors.length === 0;
 
   // Upload receipt file to Firebase Storage
   const uploadReceipts = async (files: File[]): Promise<UploadResult[]> => {
     const storage = getStorage();
     const folder = `po-${purchaseOrder.docId!}`;
     const uploadPromises = files.map((file, index) => {
-      const ext = file.type.split("/")[1] || "file";
+      // Try to get extension from file type first, fallback to filename
+      let ext = "file";
+      if (file.type && file.type.includes("/")) {
+        ext = file.type.split("/")[1];
+      } else if (file.name && file.name.includes(".")) {
+        ext = file.name.split(".").pop() || "file";
+      }
       const fileName = `attachment_${index}.${ext}`;
       const storageRef = ref(storage, `receipts/${folder}/${fileName}`);
       return uploadBytes(storageRef, file);
     });
-    return Promise.all(uploadPromises);
+    // Use allSettled to handle partial failures gracefully
+    const results = await Promise.allSettled(uploadPromises);
+    const successful: UploadResult[] = [];
+    const errors: string[] = [];
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        successful.push(result.value);
+      } else {
+        const fileName = files[index].name;
+        const errorMessage = `Failed to upload ${fileName}`;
+        errors.push(errorMessage);
+        console.error(`Failed to upload file ${fileName}:`, result.reason);
+        toast.error(`Failed to upload attachment: ${fileName}. Please try again or remove it.`);
+      }
+    });
+    setUploadErrors(errors);
+    return successful;
   }
 
   const buildAttachments = async (files: File[]): Promise<Attachment[]> => {
@@ -216,6 +251,22 @@ export default function PurchaseOrderForm({
     }
   }, [purchaseOrder, categoryType]);
 
+  // Warn user if they try to navigate away during upload
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isUploading) {
+        e.preventDefault();
+        e.returnValue = "Receipts are still uploading. Are you sure you want to leave?";
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isUploading]);
+
   const handleFiles = (files: FileList | null) => {
     if (!files) return;
     const allowedTypes = [
@@ -244,6 +295,8 @@ export default function PurchaseOrderForm({
       );
       return [...prevArr, ...uniqueFiles];
     });
+    // Clear upload errors when new files are selected
+    setUploadErrors([]);
   };
 
   // Save as draft
@@ -254,7 +307,7 @@ export default function PurchaseOrderForm({
         purchaseOrderConverter
       );
       const data: PurchaseOrder = {
-        amount: amount,
+        amount: getAmountAsNumber(),
         createdAt: purchaseOrder.createdAt,
         description: description,
         docId: purchaseOrder.docId,
@@ -282,6 +335,12 @@ export default function PurchaseOrderForm({
   // Submit (finalize)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent submission if any operation is already in progress
+    if (isSaving || isSubmitting || isUploading) {
+      return;
+    }
+    
     if (!user) {
       toast.error("You must be logged in to submit a purchase order.");
       return;
@@ -292,7 +351,23 @@ export default function PurchaseOrderForm({
       return;
     }
 
+    // Validate category BEFORE uploading files to avoid orphaned uploads
+    if (
+      (categoryType === "project" && !selectedProject) ||
+      (categoryType === "service" && !selectedServiceReport) ||
+      (categoryType === "other" && !otherCategory)
+    ) {
+      toast.error(
+        "Please fill in the required fields for the selected category."
+      );
+      return;
+    }
+
     setIsSubmitting(true);
+    setIsUploading(true);
+    setUploadErrors([]); // Clear any previous upload errors
+    setUploadProgress(`Uploading ${selectedFiles.length} receipt${selectedFiles.length > 1 ? 's' : ''}...`);
+
     try {
       const currentEmployee = await getEmployeeByEmail(user.email!);
       const token = btoa(
@@ -300,17 +375,28 @@ export default function PurchaseOrderForm({
       );
       const authorizationHeader = `Bearer ${token}`;
 
+      // Upload receipts and wait for completion
       const uploadPaths: UploadResult[] = await uploadReceipts(selectedFiles);
-      if (uploadPaths.length < selectedFiles.length) {
-        toast.error("Failed to upload receipts. Please try again.");
+      
+      // Verify all uploads completed successfully
+      if (uploadPaths.length < selectedFiles.length || uploadErrors.length > 0) {
+        const failedCount = selectedFiles.length - uploadPaths.length;
+        setIsUploading(false);
+        setIsSubmitting(false);
+        setUploadProgress("");
+        toast.error(
+          `Failed to upload ${failedCount} receipt${failedCount > 1 ? 's' : ''}. Please remove the failed attachments and try again.`
+        );
         return;
       }
+
+      setUploadProgress("Receipts uploaded successfully. Processing submission...");
       // Convert files to base64 for attachments (keep data: prefix)
       const attachments =
         selectedFiles.length > 0 ? await buildAttachments(selectedFiles) : [];
 
       const message: PurchaseOrderMessage = {
-        amount: amount,
+        amount: getAmountAsNumber(),
         materials: description,
         purchase_order_num: purchaseOrder.docId,
         project_info: selectedProject
@@ -326,18 +412,6 @@ export default function PurchaseOrderForm({
         technician_email: technician ? technician.email : "",
         attachments: attachments,
       };
-
-      // check that only 1 of the 3 category fields is set
-      if (
-        (categoryType === "project" && !selectedProject) ||
-        (categoryType === "service" && !selectedServiceReport) ||
-        (categoryType === "other" && !otherCategory)
-      ) {
-        toast.error(
-          "Please fill in the required fields for the selected category."
-        );
-        return;
-      }
 
       const res = await fetch("https://api.appliedbas.com/v2/mail/po", {
         method: "POST",
@@ -355,7 +429,7 @@ export default function PurchaseOrderForm({
         purchaseOrderConverter
       );
       const data: PurchaseOrder = {
-        amount: amount,
+        amount: getAmountAsNumber(),
         createdAt: purchaseOrder.createdAt,
         description: description,
         docId: purchaseOrder.docId,
@@ -372,11 +446,16 @@ export default function PurchaseOrderForm({
 
       await setDoc(orderRef, data, { merge: true });
 
+      setIsUploading(false);
+      setUploadProgress("");
+      setUploadErrors([]); // Clear upload errors on successful submission
       setSubmittedOrderId(purchaseOrder.id);
       setSubmitDialogOpen(true);
 
       toast.success("Purchase order submitted successfully!");
     } catch (error) {
+      setIsUploading(false);
+      setUploadProgress("");
       toast.error("Failed to submit purchase order.");
       console.error("Error submitting purchase order:", error);
     } finally {
@@ -504,10 +583,36 @@ export default function PurchaseOrderForm({
           <Label htmlFor="amount">Amount *</Label>
           <Input
             id="amount"
-            type="number"
+            type="text"
             value={amount}
-            onChange={(e) => setAmount(Number(e.target.value))}
+            onChange={(e) => {
+              const value = e.target.value;
+              // Allow empty string, or valid number format (with optional negative, digits, and single decimal point)
+              if (
+                value === "" ||
+                value === "-" ||
+                value === "." ||
+                /^-?\d*\.?\d*$/.test(value)
+              ) {
+                setAmount(value);
+              }
+            }}
+            onBlur={() => {
+              // Validate and clean up on blur
+              const parsed = parseFloat(amount);
+              if (isNaN(parsed) || parsed <= 0) {
+                // Keep the current value if it's invalid, user can fix it
+                // Or clear it if empty
+                if (amount.trim() === "") {
+                  setAmount("");
+                }
+              } else {
+                // Format to remove leading zeros and unnecessary decimals
+                setAmount(parsed.toString());
+              }
+            }}
             className="w-full md:max-w-96"
+            placeholder="0.00"
           />
         </div>
         <div className="grid gap-2">
@@ -520,7 +625,7 @@ export default function PurchaseOrderForm({
           />
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="receipts">Receipts</Label>
+          <Label htmlFor="receipts">Receipts *</Label>
           <FileSelectButton
             onFilesSelected={handleFiles}
             multiple
@@ -544,6 +649,8 @@ export default function PurchaseOrderForm({
                       setSelectedFiles((prev) =>
                         prev.filter((_, i) => i !== idx)
                       );
+                      // Clear upload errors when file is removed
+                      setUploadErrors([]);
                     }}
                   >
                     &times;
@@ -552,23 +659,44 @@ export default function PurchaseOrderForm({
               ))}
             </div>
           )}
+          {uploadErrors.length > 0 && (
+            <div className="mt-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+              <p className="text-sm font-medium text-destructive mb-1">
+                Upload Errors ({uploadErrors.length})
+              </p>
+              <ul className="text-sm text-destructive/80 list-disc list-inside space-y-1">
+                {uploadErrors.map((error, idx) => (
+                  <li key={idx}>{error}</li>
+                ))}
+              </ul>
+              <p className="text-sm text-muted-foreground mt-2">
+                Please remove the failed attachments before submitting.
+              </p>
+            </div>
+          )}
         </div>
+        {(isUploading || uploadProgress) && (
+          <div className="flex items-center gap-2 p-4 bg-muted rounded-md border">
+            <Loader2 className="animate-spin text-primary h-5 w-5" />
+            <span className="text-sm font-medium">{uploadProgress || "Uploading receipts..."}</span>
+          </div>
+        )}
         <div className="flex gap-2">
           <Button
             type="button"
             variant="outline"
             onClick={handleSave}
-            disabled={isSaving || isSubmitting}
+            disabled={isSaving || isSubmitting || isUploading}
           >
             {isSaving ? "Saving..." : "Save"}
           </Button>
           <Button
             type="submit"
-            disabled={isSaving || isSubmitting || !canSubmit}
+            disabled={isSaving || isSubmitting || isUploading || !canSubmit}
           >
-            {isSubmitting ? "Submitting..." : "Submit"}
+            {isUploading ? "Uploading..." : isSubmitting ? "Submitting..." : "Submit"}
           </Button>
-          {(isSubmitting || isSaving) && (
+          {(isSubmitting || isSaving || isUploading) && (
             <div className="my-auto">
               <Loader2 className="animate-spin text-muted-foreground" />
             </div>

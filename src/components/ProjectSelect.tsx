@@ -55,7 +55,7 @@ export default function ProjectSelect({
 
         try {
           const { hits } = await client.searchSingleIndex({
-            indexName: "projects",
+            indexName: "projects_docid_desc",
             // Only return projects where the facet `active` is true
             searchParams: {
               query: q,
