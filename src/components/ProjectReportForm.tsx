@@ -448,7 +448,7 @@ export default function ProjectReportForm({
           purchaseOrders,
           linkPurchaseOrders
         ),
-        date: new Date().toISOString(),
+        date: new Date().toLocaleDateString("en-US"),
         project_subtitle: `PR ${project.docId} - ${currentDoc} - ${project.location}`,
         technician_email: authorTechnician.email!,
         technician_name: authorTechnician.name!,
@@ -535,11 +535,7 @@ export default function ProjectReportForm({
         `${currentEmployee.clientId}:${currentEmployee.clientSecret}`
       );
       const authorizationHeader = `Bearer ${token}`;
-      const dateStr = new Date().toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
+      const dateStr = new Date().toLocaleDateString("en-US");
       const message: ProjectReportPDFMessage = {
         project_no: project.docId,
         doc_id: docId,
