@@ -801,7 +801,7 @@ export default function ServiceReportForm({
 
     const authorizationHeader = `Bearer ${token}`;
     // Now build and send email via API
-    const formatDate = (d: Date) => d.toISOString().substring(0, 10);
+    const formatDate = (d: Date) => d.toLocaleDateString("en-US");
     const firstDate = serviceNotesInputs[0].date as Date;
     const lastDate = serviceNotesInputs[serviceNotesInputs.length - 1]
       .date as Date;
@@ -1002,7 +1002,7 @@ export default function ServiceReportForm({
 
       const authorizationHeader = `Bearer ${token}`;
 
-      const formatDate = (d: Date) => d.toISOString().substring(0, 10);
+      const formatDate = (d: Date) => d.toLocaleDateString("en-US");
       const message: ServiceReportPDFMessage = {
         report_no: docId || 0,
         date: formatDate(new Date()),
