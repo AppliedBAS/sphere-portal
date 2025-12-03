@@ -24,7 +24,7 @@ export function usePurchaseOrders() {
   const qVendor = searchParams.get("vendor") || "";
   const qStatus = searchParams.get("status") || "";
   const qSrDocId = searchParams.get("srDocId");
-  const qProjectDocId = searchParams.get("projectDocId");
+  const qProjectDocId = searchParams.get("projectDocId") || searchParams.get("pr");
 
   function quoteIfNeeded(v: string) {
     // quote if spaces or special chars; escape inner quotes

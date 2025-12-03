@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, FormEvent } from "react";
+import { useState, useEffect, FormEvent, useMemo } from "react";
 import EmployeeSelect from "./EmployeeSelect";
 import {
   Employee as EmployeeModel,
@@ -51,6 +51,7 @@ export default function ProjectReportForm({
   projectReport,
 }: ProjectReportFormProps) {
   const {
+    employees,
     technicians,
     loading: loadingEmployees,
     error: employeesError,
@@ -187,6 +188,13 @@ export default function ProjectReportForm({
     setAssignedTechnicians((prev) => prev.filter((e) => e.id !== empId));
   };
 
+  // Filter employees to include both technicians and admins for lead technician selection
+  const leadTechnicianOptions = useMemo(() => {
+    return employees.filter(
+      (emp) => emp.role === "technician" || emp.role === "admin"
+    );
+  }, [employees]);
+
   // Fetch purchase orders if switch is enabled and project is selected
   useEffect(() => {
     const fetchPurchaseOrders = async () => {
@@ -254,24 +262,20 @@ export default function ProjectReportForm({
 
   const handleSaveDraft = async () => {
     setIsSaving(true);
-    setIsSubmitting(true);
     if (!user ) {
       toast.error("User is required");
       setIsSaving(false);
-      setIsSubmitting(false);
       return;
     }
     if (!authorTechnician) {
       toast.error("Author technician is required");
       setIsSaving(false);
-      setIsSubmitting(false);
       return;
     }
 
     if (!project) {
       toast.error("Project is required");
       setIsSaving(false);
-      setIsSubmitting(false);
       return;
     }
     try {
@@ -353,7 +357,6 @@ export default function ProjectReportForm({
       toast.error("Error saving draft");
     } finally {
       setIsSaving(false);
-      setIsSubmitting(false);
     }
   };
 
@@ -442,7 +445,7 @@ export default function ProjectReportForm({
         client_name: project.client,
         location: project.location,
         description: project.description,
-        notes: notes,
+        notes: notes || "None",
         materials: combineMaterials(
           additionalMaterials,
           purchaseOrders,
@@ -578,6 +581,15 @@ export default function ProjectReportForm({
 
   return (
     <>
+      {/* Fixed Loading Indicator */}
+      {(isSubmitting || isSaving || isPreviewing) && (
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 bg-background border rounded-lg shadow-lg px-4 py-3">
+          <Loader2 className="animate-spin h-5 w-5 text-primary" />
+          <span className="text-sm font-medium">
+            {isSubmitting ? "Submitting..." : isSaving ? "Saving..." : "Previewing..."}
+          </span>
+        </div>
+      )}
       {/* AI Rephrase Dialog */}
       <Dialog open={rephraseDialogOpen} onOpenChange={setRephraseDialogOpen}>
         <DialogContent>
@@ -655,7 +667,7 @@ export default function ProjectReportForm({
           <div className="flex flex-col space-y-2">
             <Label htmlFor="leadTechnician">Lead Technician</Label>
             <EmployeeSelect
-              employees={technicians}
+              employees={leadTechnicianOptions}
               loading={loadingEmployees}
               error={employeesError}
               refetch={refetchEmployees}
@@ -779,37 +791,36 @@ export default function ProjectReportForm({
           </div>
 
           {/* Action buttons */}
-          <div className="mt-8 flex gap-4 mb-8 justify-baseline items-center">
-            <Button
-              type="button"
-              disabled={isSaving || isPreviewing || isSubmitting || !project}
-              variant="outline"
-              onClick={handleSaveDraft}
-            >
-              {isSaving ? "Saving..." : "Save"}
-            </Button>
-
-            <Button
-              type="button"
-              disabled={isPreviewing || isSubmitting || !project}
-              variant="outline"
-              onClick={handlePreview}
-            >
-              {isPreviewing ? "Previewing..." : "Preview"}
-            </Button>
-
-            <Button
-              type="submit"
-              disabled={isSubmitting || !project}
-              variant="default"
-            >
-              {isSubmitting ? "Submitting..." : "Submit"}
-            </Button>
-            {(isSubmitting || isSaving || isPreviewing) && (
-              <div className="my-auto">
-                <Loader2 className="animate-spin text-muted-foreground" />
-              </div>
-            )}
+          <div className="mt-8 mb-8">
+            {/* Preview button on its own line */}
+            <div className="mb-4">
+              <Button
+                type="button"
+                disabled={isPreviewing || isSaving || isSubmitting || !project}
+                variant="outline"
+                onClick={handlePreview}
+              >
+                {isPreviewing ? "Previewing..." : "Preview"}
+              </Button>
+            </div>
+            {/* Save and Submit buttons on same line */}
+            <div className="flex gap-4">
+              <Button
+                type="button"
+                disabled={isSaving || isPreviewing || isSubmitting || !project}
+                variant="outline"
+                onClick={handleSaveDraft}
+              >
+                {isSaving ? "Saving..." : "Save"}
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSubmitting || isSaving || isPreviewing || !project}
+                variant="default"
+              >
+                {isSubmitting ? "Submitting..." : "Submit"}
+              </Button>
+            </div>
           </div>
         </div>
       </form>

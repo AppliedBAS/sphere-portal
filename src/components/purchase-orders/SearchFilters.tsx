@@ -19,6 +19,8 @@ interface SearchFiltersProps {
   qMaxAmount: number;
   qVendor: string;
   qStatus: string;
+  qSrDocId?: string | null;
+  qProjectDocId?: string | null;
   onDescriptionChange: (val: string) => void;
   onAmountChange: (minAmount: number, maxAmount: number) => void;
   onVendorChange: (val: string) => void;
@@ -32,6 +34,8 @@ export function SearchFilters({
   qMaxAmount,
   qVendor,
   qStatus,
+  qSrDocId,
+  qProjectDocId,
   onDescriptionChange,
   onAmountChange,
   onVendorChange,
@@ -76,7 +80,8 @@ export function SearchFilters({
   };
 
   const hasActiveFilters = qDescription !== "" ||
-    (qMinAmount !== 0 || qMaxAmount !== MAX_AMOUNT) || qVendor !== "" || qStatus !== "";
+    (qMinAmount !== 0 || qMaxAmount !== MAX_AMOUNT) || qVendor !== "" || qStatus !== "" ||
+    !!qSrDocId || !!qProjectDocId;
 
   return (
     <div className="flex items-center gap-2 mb-4">
@@ -192,7 +197,7 @@ export function SearchFilters({
         </SelectContent>
       </Select>
 
-      {/* Clear All Filters Button - only show when there are active filters */}
+      {/* Reset Filters Button - only show when there are active filters */}
       {hasActiveFilters && (
         <Button
           variant="secondary"
@@ -201,7 +206,7 @@ export function SearchFilters({
           className="flex items-center gap-1"
         >
           <X className="h-4 w-4" />
-          Clear All
+          Reset Filters
         </Button>
       )}
     </div>

@@ -10,6 +10,7 @@ export interface ServiceReport {
   id: string;
   authorTechnicianRef: DocumentReference;
   assignedTechnicianRef: DocumentReference | null;
+  dispatcherRef: DocumentReference | null;
   cityStateZip: string;
   clientName: string;
   contactEmail: string;
@@ -61,6 +62,7 @@ export const serviceReportConverter: FirestoreDataConverter<ServiceReport> = {
     return {
       "author-technician-ref": report.authorTechnicianRef,
       "assigned-technician-ref": report.assignedTechnicianRef,
+      "dispatcher-ref": report.dispatcherRef,
       "city-state-zip": report.cityStateZip,
       "client-name": report.clientName,
       "contact-email": report.contactEmail,
@@ -92,6 +94,7 @@ export const serviceReportConverter: FirestoreDataConverter<ServiceReport> = {
       id: snapshot.id,
       authorTechnicianRef: data["author-technician-ref"],
       assignedTechnicianRef: data["assigned-technician-ref"],
+      dispatcherRef: data["dispatcher-ref"] ?? null,
       cityStateZip: data["city-state-zip"],
       clientName: data["client-name"],
       contactEmail: data["contact-email"],

@@ -86,11 +86,15 @@ export default function ServiceReportForm({
   serviceReport,
 }: ServiceReportFormProps) {
   const {
+    employees,
     technicians,
     loading: loadingEmployees,
     error: employeesError,
     refetch: refetchEmployees,
   } = useEmployees();
+
+  // Filter employees to only show admins for dispatcher selection
+  const adminEmployees = employees.filter((emp) => emp.role === "admin");
 
   const { user, firebaseUser } = useAuth();
   const [rephraseDialogOpen, setRephraseDialogOpen] = useState(false);
@@ -115,6 +119,7 @@ export default function ServiceReportForm({
   const [assignedTechnician, setAssignedTechnician] = useState<Employee | null>(
     null
   );
+  const [dispatcher, setDispatcher] = useState<Employee | null>(null);
 
   const [docId, setDocId] = useState<number | null>(serviceReport?.docId || 0);
   // The chosen client (from ClientSelect)
@@ -225,6 +230,15 @@ export default function ServiceReportForm({
         const empSnap = await getDoc(empRef);
         if (empSnap.exists()) {
           setAssignedTechnician(empSnap.data() as Employee);
+        }
+      }
+
+      if (serviceReport.dispatcherRef) {
+        const empRef =
+          serviceReport.dispatcherRef.withConverter(employeeConverter);
+        const empSnap = await getDoc(empRef);
+        if (empSnap.exists()) {
+          setDispatcher(empSnap.data() as Employee);
         }
       }
       // Populate client from serviceReport.clientName if available
@@ -434,9 +448,9 @@ export default function ServiceReportForm({
 
   const handleSaveDraft = async () => {
     setIsSaving(true);
-    setIsSubmitting(true);
 
     if (!user) {
+      setIsSaving(false);
       return;
     }
 
@@ -446,7 +460,7 @@ export default function ServiceReportForm({
           Error loading author technician. Please try again later.
         </span>
       );
-      setIsSubmitting(false);
+      setIsSaving(false);
       return;
     }
 
@@ -456,7 +470,7 @@ export default function ServiceReportForm({
           Please select a client before saving the draft.
         </span>
       );
-      setIsSubmitting(false);
+      setIsSaving(false);
       return;
     }
 
@@ -466,7 +480,7 @@ export default function ServiceReportForm({
           Please select a building before saving the draft.
         </span>
       );
-      setIsSubmitting(false);
+      setIsSaving(false);
       return;
     }
 
@@ -476,7 +490,7 @@ export default function ServiceReportForm({
           Please add at least one service note before saving the draft.
         </span>
       );
-      setIsSubmitting(false);
+      setIsSaving(false);
       return;
     }
 
@@ -496,6 +510,9 @@ export default function ServiceReportForm({
           ),
           assignedTechnicianRef: assignedTechnician
             ? doc(firestore, "employees", assignedTechnician.id)
+            : null,
+          dispatcherRef: dispatcher
+            ? doc(firestore, "employees", dispatcher.id)
             : null,
           clientName: client.clientName,
           serviceAddress1: building.serviceAddress1,
@@ -552,6 +569,9 @@ export default function ServiceReportForm({
           assignedTechnicianRef: assignedTechnician
             ? doc(firestore, "employees", assignedTechnician.id)
             : null,
+          dispatcherRef: dispatcher
+            ? doc(firestore, "employees", dispatcher.id)
+            : null,
           clientName: client.clientName,
           serviceAddress1: building.serviceAddress1,
           serviceAddress2: building.serviceAddress2,
@@ -588,7 +608,6 @@ export default function ServiceReportForm({
       );
     } finally {
       setIsSaving(false);
-      setIsSubmitting(false);
     }
   };
 
@@ -673,6 +692,24 @@ export default function ServiceReportForm({
     return combined && combined.trim() !== "" ? combined : "None";
   }
 
+  // Helper to get all unique emails from dispatcher, assigned technician, and author technician
+  function getTechnicianEmails(): string[] {
+    const technicianEmails: string[] = [];
+    if (dispatcher?.email) technicianEmails.push(dispatcher.email);
+    if (assignedTechnician?.email) technicianEmails.push(assignedTechnician.email);
+    if (authorTechnician?.email) technicianEmails.push(authorTechnician.email);
+    // Remove duplicates
+    return [...new Set(technicianEmails)];
+  }
+
+  // Helper to get all unique emails (technician emails + manual emails)
+  function getAllUniqueEmails(): string[] {
+    const technicianEmails = getTechnicianEmails();
+    const allEmails = [...technicianEmails, ...emails];
+    // Remove duplicates and empty strings
+    return [...new Set(allEmails.filter(email => email && email.trim() !== ""))];
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -717,6 +754,31 @@ export default function ServiceReportForm({
       return;
     }
 
+    // Validate service notes - each note must have at least technician time
+    const invalidNotes: number[] = [];
+    serviceNotesInputs.forEach((note, index) => {
+      const techTime = parseFloat(note.technicianTime) || 0;
+      const helperTime = parseFloat(note.helperTime) || 0;
+      
+      // At least technician time must be greater than 0
+      if (techTime <= 0 && helperTime <= 0) {
+        invalidNotes.push(index + 1); // Entry numbers are 1-based for display
+      }
+    });
+
+    if (invalidNotes.length > 0) {
+      const entryText = invalidNotes.length === 1 
+        ? `Entry #${invalidNotes[0]}` 
+        : `Entries #${invalidNotes.join(", #")}`;
+      toast.error(
+        <span className="text-lg md:text-sm">
+          Missing time information: {entryText} {invalidNotes.length === 1 ? "is" : "are"} missing technician time. All service notes must have at least technician time.
+        </span>
+      );
+      setIsSubmitting(false);
+      return;
+    }
+
     // Reserve or use existing docId
     let currentDocId = docId;
     let id = serviceReport?.id;
@@ -730,6 +792,9 @@ export default function ServiceReportForm({
         authorTechnicianRef: doc(firestore, "employees", authorTechnician!.id),
         assignedTechnicianRef: assignedTechnician
           ? doc(firestore, "employees", assignedTechnician.id)
+          : null,
+        dispatcherRef: dispatcher
+          ? doc(firestore, "employees", dispatcher.id)
           : null,
         clientName: client.clientName,
         serviceAddress1: building.serviceAddress1,
@@ -770,6 +835,9 @@ export default function ServiceReportForm({
       id = serviceReport!.id;
       await setDoc(reportRef, {
         ...serviceReport!,
+        dispatcherRef: dispatcher
+          ? doc(firestore, "employees", dispatcher.id)
+          : null,
         serviceNotes: serviceNotesInputs.map((n) => ({
           date: Timestamp.fromDate(n.date as Date),
           technicianTime: n.technicianTime,
@@ -805,6 +873,10 @@ export default function ServiceReportForm({
     const firstDate = serviceNotesInputs[0].date as Date;
     const lastDate = serviceNotesInputs[serviceNotesInputs.length - 1]
       .date as Date;
+    
+    // Determine which technician to use: assigned technician > dispatcher > author technician
+    const technicianForReport = assignedTechnician || dispatcher || authorTechnician;
+    
     const message: ServiceReportMessage = {
       report_no: currentDocId!,
       date: formatDate(new Date()),
@@ -845,12 +917,12 @@ export default function ServiceReportForm({
         remote: n.remoteWork,
         note: n.notes,
       })),
-      technician_name: authorTechnician.name,
-      technician_phone: authorTechnician.phone,
-      technician_email: authorTechnician.email,
+      technician_name: technicianForReport.name,
+      technician_phone: technicianForReport.phone,
+      technician_email: technicianForReport.email,
       print_name: null,
       sign_date: null,
-      to_emails: emails,
+      to_emails: getAllUniqueEmails(),
       start_date: formatDate(firstDate),
       end_date: formatDate(lastDate),
     };
@@ -960,31 +1032,31 @@ export default function ServiceReportForm({
   // Generate PDF preview via API
   const handleGeneratePDF = async () => {
     setIsPreviewing(true);
-    if (!user) {
-      toast.error(
-        <span className="text-lg md:text-sm">
-          You must be logged in to generate a PDF
-        </span>
-      );
-      return;
-    }
-    if (!client || !building) {
-      toast.error(
-        <span className="text-lg md:text-sm">
-          Please select a client and building
-        </span>
-      );
-      return;
-    }
-    if (!authorTechnician) {
-      toast.error(
-        <span className="text-lg md:text-sm">
-          Error loading author technician. Try again later.
-        </span>
-      );
-      return;
-    }
     try {
+      if (!user) {
+        toast.error(
+          <span className="text-lg md:text-sm">
+            You must be logged in to generate a PDF
+          </span>
+        );
+        return;
+      }
+      if (!client || !building) {
+        toast.error(
+          <span className="text-lg md:text-sm">
+            Please select a client and building
+          </span>
+        );
+        return;
+      }
+      if (!authorTechnician) {
+        toast.error(
+          <span className="text-lg md:text-sm">
+            Error loading author technician. Try again later.
+          </span>
+        );
+        return;
+      }
       const currentEmployee: Employee = await getEmployeeByEmail(user.email!);
       // create base64 encoded bearer token
       const token = btoa(
@@ -1003,6 +1075,10 @@ export default function ServiceReportForm({
       const authorizationHeader = `Bearer ${token}`;
 
       const formatDate = (d: Date) => d.toLocaleDateString("en-US");
+      
+      // Determine which technician to use: assigned technician > dispatcher > author technician
+      const technicianForReport = assignedTechnician || dispatcher || authorTechnician;
+      
       const message: ServiceReportPDFMessage = {
         report_no: docId || 0,
         date: formatDate(new Date()),
@@ -1041,8 +1117,8 @@ export default function ServiceReportForm({
           remote: n.remoteWork,
           note: n.notes,
         })),
-        technician_name: authorTechnician.name,
-        technician_phone: authorTechnician.phone,
+        technician_name: technicianForReport.name,
+        technician_phone: technicianForReport.phone,
         print_name: null,
         sign_date: null,
       };
@@ -1099,6 +1175,15 @@ export default function ServiceReportForm({
 
   return (
     <>
+      {/* Fixed Loading Indicator */}
+      {(isSubmitting || isSaving || isPreviewing) && (
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 bg-background border rounded-lg shadow-lg px-4 py-3">
+          <Loader2 className="animate-spin h-5 w-5 text-primary" />
+          <span className="text-sm font-medium">
+            {isSubmitting ? "Submitting..." : isSaving ? "Saving..." : "Previewing..."}
+          </span>
+        </div>
+      )}
       {/* AI Rephrase Dialog */}
       <Dialog open={rephraseDialogOpen} onOpenChange={setRephraseDialogOpen}>
         <DialogContent>
@@ -1156,13 +1241,28 @@ export default function ServiceReportForm({
         <div className="mt-4 flex flex-col gap-6">
           {/* === DocId === */}
           {docId !== null && docId != 0 && (
-            <div className="flex flex-col space-y-2">
-              <Label htmlFor="docId" className="text-lg md:text-sm">
-                Report No.
-              </Label>
+            <div className="flex flex-col space-y-2 md:max-w-96">
+              <Label htmlFor="docId">Report No.</Label>
               <Input id="docId" type="text" value={docId.toString()} readOnly />
             </div>
           )}
+          {/* === Dispatcher === */}
+          <div className="flex flex-col space-y-2">
+            <Label htmlFor="dispatcher">Dispatcher</Label>
+            <EmployeeSelect
+              employees={adminEmployees}
+              loading={loadingEmployees}
+              error={employeesError}
+              refetch={refetchEmployees}
+              selectedEmployee={dispatcher}
+              setSelectedEmployee={setDispatcher}
+              placeholder="Select Dispatcher..."
+            />
+            <p className="text-sm text-muted-foreground mt-2">
+              Select the person in charge of creating this job. If you are the dispatcher, assign yourself.
+            </p>
+          </div>
+
           {/* === Assigned Technician === */}
           <div className="flex flex-col space-y-2">
             <Label htmlFor="authorTechnician">Assigned Technician</Label>
@@ -1176,7 +1276,7 @@ export default function ServiceReportForm({
               placeholder="Select Technician..."
             />
             <p className="text-sm text-muted-foreground mt-2">
-              Leave blank if you are the assigned technician.
+              if you are the assigned tech, assign yourself.
             </p>
           </div>
 
@@ -1373,9 +1473,9 @@ export default function ServiceReportForm({
           {/* === Contact & Address Fields (always editable, visually separated) === */}
           {building && (
             <div className="flex flex-col gap-4 p-4 mt-4 mb-2 border rounded-lg bg-muted/30">
-              <span className="font-semibold text-lg md:text-sm mb-2">
+              <Label className="font-semibold mb-2">
                 Contact Information
-              </span>
+              </Label>
               <div className="flex flex-col space-y-2">
                 <Label htmlFor="contactName">Contact Name</Label>
                 <Input
@@ -1392,6 +1492,7 @@ export default function ServiceReportForm({
                     )
                   }
                   placeholder="Contact Name"
+                  className="text-sm"
                 />
               </div>
               <div className="flex flex-col space-y-2">
@@ -1416,6 +1517,7 @@ export default function ServiceReportForm({
                   }}
                   placeholder="Contact Email"
                   type="email"
+                  className="text-sm"
                 />
               </div>
               <div className="flex flex-col space-y-2">
@@ -1431,6 +1533,7 @@ export default function ServiceReportForm({
                   }}
                   type="tel"
                   placeholder="Contact Phone"
+                  className="text-sm"
                 />
               </div>
               {/* Save/Cancel Contact Buttons */}
@@ -1462,7 +1565,7 @@ export default function ServiceReportForm({
               checked={isWarranty}
               onCheckedChange={handleWarrantyChange}
             />
-            <p className="text-base sm:text-sm">{isWarranty ? "Yes" : "No"}</p>
+            <p className="text-sm">{isWarranty ? "Yes" : "No"}</p>
           </div>
           <p className="text-sm text-muted-foreground">
             If enabled, this will send the email to our system internally.
@@ -1476,7 +1579,7 @@ export default function ServiceReportForm({
               checked={linkPurchaseOrders}
               onCheckedChange={setLinkPurchaseOrders}
             />
-            <p className="text-base sm:text-sm">{linkPurchaseOrders ? "On" : "Off"}</p>
+            <p className="text-sm">{linkPurchaseOrders ? "On" : "Off"}</p>
             {loadingPOs && <Loader2 className="animate-spin h-4 w-4 ml-2 text-muted-foreground" />}
           </div>
           {linkPurchaseOrders && !loadingPOs && (
@@ -1505,12 +1608,13 @@ export default function ServiceReportForm({
               onChange={(e) => setMaterialNotes(e.target.value)}
               placeholder="Optional materials used not already in POs"
               rows={3}
+              className="text-sm"
             />
           </div>
 
           {/* === Service Notes === */}
           <div className="mt-6">
-            <span className="text-lg md:text-sm">Service Notes</span>
+            <Label>Service Notes</Label>
             {serviceNotesInputs.map((note, idx) => (
               <div key={idx} className="mt-4 border rounded-lg p-4 space-y-4">
                 <div className="flex justify-between items-center">
@@ -1529,7 +1633,7 @@ export default function ServiceReportForm({
                   )}
                 </div>
 
-                <div>
+                <div className="md:max-w-96">
                   <Label htmlFor={`noteDate_${idx}`} className="mb-2 block">
                     Date
                   </Label>
@@ -1538,7 +1642,7 @@ export default function ServiceReportForm({
                       <Button
                         variant={note.date ? "outline" : "secondary"}
                         className={
-                          "w-full max-w-[400px] justify-start text-left font-normal flex items-center " +
+                          "w-full justify-start text-left font-normal flex items-center " +
                           (!note.date ? "text-muted-foreground" : "")
                         }
                       >
@@ -1647,7 +1751,7 @@ export default function ServiceReportForm({
                       )
                     }
                   />
-                  <span className="ml-2 text-lg md:text-sm">
+                  <span className="ml-2 text-sm">
                     {note.remoteWork === "Y" ? "Yes" : "No"}
                   </span>
                 </div>
@@ -1665,6 +1769,7 @@ export default function ServiceReportForm({
                     rows={3}
                     placeholder="Describe work performed"
                     required
+                    className="text-sm"
                   />
                   <div className="flex justify-end mt-2">
                     <Button
@@ -1711,77 +1816,100 @@ export default function ServiceReportForm({
           {/* Create list of inputs per contact email, buttons to remove and add contact emails */}
           <div className="mt-6">
             <Label>Email Contacts</Label>
-            <Label className="text-muted-foreground mt-2 mb-4">
-              <span className="text-card-foreground">
-                {assignedTechnician
-                  ? assignedTechnician.email
-                  : authorTechnician!.email!}
-              </span>{" "}
-              included.
-            </Label>
+            <p className="text-sm text-muted-foreground mt-2 mb-4">
+              The following emails will receive the service report:
+            </p>
 
-            {emails.map((email, idx) => (
-              <div key={idx} className="flex items-center gap-4 mt-4">
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => {
-                    const newEmails = [...emails];
-                    newEmails[idx] = e.target.value;
-                    setEmails(newEmails);
-                  }}
-                  placeholder="Contact Email"
-                  className="flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => handleRemoveEmail(idx)}
-                >
-                  Remove
-                </Button>
+            {/* Display technician emails (read-only) */}
+            {getTechnicianEmails().length > 0 && (
+              <div className="mb-4">
+                <Label className="text-sm font-medium mb-2 block">
+                  Automatic (from Dispatcher, Assigned Technician, Author Technician):
+                </Label>
+                {getTechnicianEmails().map((email, idx) => (
+                  <div key={`tech-${idx}`} className="flex items-center gap-4 mt-2 md:max-w-96">
+                    <Input
+                      type="email"
+                      value={email}
+                      readOnly
+                      className="flex-1 bg-muted text-sm"
+                      disabled
+                    />
+                    <span className="text-xs text-muted-foreground">Auto</span>
+                  </div>
+                ))}
               </div>
-            ))}
-            <Button
-              type="button"
-              variant="secondary"
-              className="mt-4"
-              onClick={handleAddEmail}
-            >
-              Add Email Contact
-            </Button>
+            )}
+
+            {/* Display manual emails (editable) */}
+            <div>
+              <Label className="text-sm font-medium mb-2 block">
+                Additional Email Contacts:
+              </Label>
+              {emails.map((email, idx) => (
+                <div key={idx} className="flex items-center gap-4 mt-2 md:max-w-96">
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => {
+                      const newEmails = [...emails];
+                      newEmails[idx] = e.target.value;
+                      setEmails(newEmails);
+                    }}
+                    placeholder="Contact Email"
+                    className="flex-1 text-sm"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleRemoveEmail(idx)}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="secondary"
+                className="mt-4"
+                onClick={handleAddEmail}
+              >
+                Add Email Contact
+              </Button>
+            </div>
 
             {/* === Preview/Save/Submit Buttons === */}
-            <div className="mt-8 flex gap-4 mb-8">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isSubmitting || !client || !building || isSaving || isPreviewing}
-                onClick={handleGeneratePDF}
-              >
-                {isPreviewing ? "Previewing..." : "Preview"}
-              </Button>
-              <Button
-                type="button"
-                disabled={isSubmitting || !client || !building || isSaving || isPreviewing}
-                variant="outline"
-                onClick={handleSaveDraft}
-              >
-                {isSaving ? "Saving..." : "Save"}
-              </Button>
-              <Button
-                type="submit"
-                disabled={isSubmitting || !client || !building || isSaving || isPreviewing}
-                variant="default"
-              >
-                {isSubmitting ? "Submitting..." : "Submit"}
-              </Button>
-              {(isSubmitting || isSaving || isPreviewing) && (
-                <div className="my-auto">
-                  <Loader2 className="animate-spin text-muted-foreground" />
-                </div>
-              )}
+            <div className="mt-8 mb-8">
+              {/* Preview button on its own line */}
+              <div className="mb-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isPreviewing || isSaving || isSubmitting || !client || !building}
+                  onClick={handleGeneratePDF}
+                >
+                  {isPreviewing ? "Previewing..." : "Preview"}
+                </Button>
+              </div>
+              {/* Save and Submit buttons on same line */}
+              <div className="flex gap-4">
+                <Button
+                  type="button"
+                  disabled={isSaving || isSubmitting || !client || !building}
+                  variant="outline"
+                  onClick={handleSaveDraft}
+                >
+                  {isSaving ? "Saving..." : "Save"}
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSaving || isSubmitting || !client || !building}
+                  variant="default"
+                >
+                  {isSubmitting ? "Submitting..." : "Submit"}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

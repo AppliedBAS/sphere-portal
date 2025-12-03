@@ -192,11 +192,15 @@ const ProjectReportPage = () => {
           )}
           <div>
             <div className="font-semibold">Materials</div>
-            <div>{report.materials || <span className="text-muted-foreground">None</span>}</div>
+            <div style={{ whiteSpace: "pre-line" }}>
+              {report.materials || <span className="text-muted-foreground">None</span>}
+            </div>
           </div>
           <div>
             <div className="font-semibold">Notes</div>
-            <div>{report.notes || <span className="text-muted-foreground">None</span>}</div>
+            <div style={{ whiteSpace: "pre-line" }}>
+              {report.notes || <span className="text-muted-foreground">None</span>}
+            </div>
           </div>
         </Card>
       </div>

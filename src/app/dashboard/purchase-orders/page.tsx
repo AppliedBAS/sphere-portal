@@ -21,7 +21,7 @@ import { MAX_AMOUNT } from "@/lib/utils";
 export default function PurchaseOrders() {
   const router = useRouter();
 
-  const { orders, loading, ordersCount, totalCount, totalPages, qMinAmount, qMaxAmount, qDescription, qStatus, qVendor, qPage, qPageSize } = usePurchaseOrders();
+  const { orders, loading, ordersCount, totalCount, totalPages, qMinAmount, qMaxAmount, qDescription, qStatus, qVendor, qPage, qPageSize, qSrDocId, qProjectDocId } = usePurchaseOrders();
 
   const handleDescriptionChange = (description: string) => {
     window.location.href = `/dashboard/purchase-orders?${buildSearchParams(description, qMinAmount, qMaxAmount, qVendor, qStatus)}`;
@@ -40,6 +40,7 @@ export default function PurchaseOrders() {
   };
 
   const handleFilterReset = () => {
+    // Clear all filters including srDocId and projectDocId/pr parameters
     window.location.href = `/dashboard/purchase-orders`;
   };
 
@@ -128,6 +129,8 @@ export default function PurchaseOrders() {
         qMaxAmount={qMaxAmount}
         qStatus={qStatus}
         qVendor={qVendor}
+        qSrDocId={qSrDocId}
+        qProjectDocId={qProjectDocId}
         onDescriptionChange={handleDescriptionChange}
         onAmountChange={handleAmountChange}
         onStatusChange={handleStatusChange}

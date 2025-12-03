@@ -37,6 +37,7 @@ const ServiceReportViewPage = () => {
   const [assignedTechnician, setAssignedTechnician] = useState<Employee | null>(
     null
   );
+  const [dispatcher, setDispatcher] = useState<Employee | null>(null);
 
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
 
@@ -61,6 +62,26 @@ const ServiceReportViewPage = () => {
           authorTechnicianSnap.exists() ? authorTechnicianSnap.data() : null
         );
 
+        // Fetch assigned technician
+        if (data.assignedTechnicianRef) {
+          const assignedTechnicianRef =
+            data.assignedTechnicianRef.withConverter(employeeConverter);
+          const assignedTechnicianSnap = await getDoc(assignedTechnicianRef);
+          setAssignedTechnician(
+            assignedTechnicianSnap.exists() ? assignedTechnicianSnap.data() : null
+          );
+        }
+
+        // Fetch dispatcher
+        if (data.dispatcherRef) {
+          const dispatcherRef =
+            data.dispatcherRef.withConverter(employeeConverter);
+          const dispatcherSnap = await getDoc(dispatcherRef);
+          setDispatcher(
+            dispatcherSnap.exists() ? dispatcherSnap.data() : null
+          );
+        }
+
         // Get Purchase Orders associated with this report
         const purchaseOrdersRef = collection(firestore, "orders").withConverter(
           purchaseOrderConverter
@@ -71,18 +92,6 @@ const ServiceReportViewPage = () => {
         );
         const purchaseOrdersSnap = await getDocs(purchaseOrdersQuery);
         setPurchaseOrders(purchaseOrdersSnap.docs.map((doc) => doc.data()));
-
-
-        if (!data.assignedTechnicianRef) {
-          setLoading(false);
-          return;
-        }
-        const assignedTechnicianRef =
-          data.assignedTechnicianRef.withConverter(employeeConverter);
-        const assignedTechnicianSnap = await getDoc(assignedTechnicianRef);
-        setAssignedTechnician(
-          assignedTechnicianSnap.exists() ? assignedTechnicianSnap.data() : null
-        );
       }
 
       setLoading(false);
@@ -170,14 +179,14 @@ const ServiceReportViewPage = () => {
                 : "Unable to parse date"}
             </div>
           </div>
-          {/* Author Technician */}
+          {/* Dispatcher */}
           <div>
-            <div className="font-semibold">Author Technician</div>
-            {authorTechnician ? (
+            <div className="font-semibold">Dispatcher</div>
+            {dispatcher ? (
               <>
-                {authorTechnician?.name && <div>{authorTechnician.name}</div>}
-                {authorTechnician?.phone && <div>{authorTechnician.phone}</div>}
-                {authorTechnician?.email && <div>{authorTechnician.email}</div>}
+                {dispatcher?.name && <div>{dispatcher.name}</div>}
+                {dispatcher?.phone && <div>{dispatcher.phone}</div>}
+                {dispatcher?.email && <div>{dispatcher.email}</div>}
               </>
             ) : (
               <div className="text-muted-foreground">None</div>
@@ -197,6 +206,19 @@ const ServiceReportViewPage = () => {
                 {assignedTechnician?.email && (
                   <div>{assignedTechnician.email}</div>
                 )}
+              </>
+            ) : (
+              <div className="text-muted-foreground">None</div>
+            )}
+          </div>
+          {/* Author Technician */}
+          <div>
+            <div className="font-semibold">Author Technician</div>
+            {authorTechnician ? (
+              <>
+                {authorTechnician?.name && <div>{authorTechnician.name}</div>}
+                {authorTechnician?.phone && <div>{authorTechnician.phone}</div>}
+                {authorTechnician?.email && <div>{authorTechnician.email}</div>}
               </>
             ) : (
               <div className="text-muted-foreground">None</div>

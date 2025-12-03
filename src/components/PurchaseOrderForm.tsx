@@ -482,6 +482,15 @@ export default function PurchaseOrderForm({
 
   return (
     <>
+      {/* Fixed Loading Indicator */}
+      {(isSubmitting || isSaving || isUploading) && (
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 bg-background border rounded-lg shadow-lg px-4 py-3">
+          <Loader2 className="animate-spin h-5 w-5 text-primary" />
+          <span className="text-sm font-medium">
+            {isUploading ? "Uploading..." : isSubmitting ? "Submitting..." : "Saving..."}
+          </span>
+        </div>
+      )}
       {/* Submit Success Dialog */}
       <Dialog open={submitDialogOpen} onOpenChange={setSubmitDialogOpen}>
         <DialogContent>
@@ -696,11 +705,6 @@ export default function PurchaseOrderForm({
           >
             {isUploading ? "Uploading..." : isSubmitting ? "Submitting..." : "Submit"}
           </Button>
-          {(isSubmitting || isSaving || isUploading) && (
-            <div className="my-auto">
-              <Loader2 className="animate-spin text-muted-foreground" />
-            </div>
-          )}
         </div>
       </form>
     </>
