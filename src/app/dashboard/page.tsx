@@ -30,6 +30,21 @@ export default function Dashboard() {
     purchaseOrders: PurchaseOrder[];
   }>({ projectReports: [], serviceReports: [], purchaseOrders: [] });
   const [loading, setLoading] = useState(true);
+  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+  
+  // Unique version/ID for this update dialog - increment this for future updates
+  const UPDATE_DIALOG_VERSION = "2025-update-1";
+
+  useEffect(() => {
+    // Check if this specific update dialog has been dismissed
+    const dismissedDialogs = JSON.parse(
+      localStorage.getItem("update-dialogs-dismissed") || "[]"
+    ) as string[];
+    
+    if (!dismissedDialogs.includes(UPDATE_DIALOG_VERSION)) {
+      setShowUpdateDialog(true);
+    }
+  }, []);
 
   useEffect(() => {
     const unsubscribePR = onSnapshot(
@@ -183,12 +198,68 @@ export default function Dashboard() {
     </div>
   );
 
+  const handleDismissUpdateDialog = () => {
+    setShowUpdateDialog(false);
+    // Add this dialog version to the dismissed list
+    const dismissedDialogs = JSON.parse(
+      localStorage.getItem("update-dialogs-dismissed") || "[]"
+    ) as string[];
+    
+    if (!dismissedDialogs.includes(UPDATE_DIALOG_VERSION)) {
+      dismissedDialogs.push(UPDATE_DIALOG_VERSION);
+      localStorage.setItem("update-dialogs-dismissed", JSON.stringify(dismissedDialogs));
+    }
+  };
+
   if (loading) {
     return <p>Loading...</p>;
   }
 
   return (
     <div className="space-y-6 pb-8">
+      {/* Update Dialog */}
+      <Dialog 
+        open={showUpdateDialog} 
+        onOpenChange={(open) => {
+          if (!open) {
+            handleDismissUpdateDialog();
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>System Updates</DialogTitle>
+            <DialogDescription>
+              Here are the latest improvements to the system:
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <h3 className="font-semibold mb-2">Service Reports (SRs)</h3>
+              <p className="text-sm text-muted-foreground">
+                Service Reports now require you to select a dispatcher before submission. This helps ensure proper assignment and tracking of work orders.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Purchase Orders (POs)</h3>
+              <p className="text-sm text-muted-foreground">
+                When submitting Purchase Orders, you'll now see real-time notifications showing receipt processing and upload progress, making it easier to track your submission status.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Performance Improvements</h3>
+              <p className="text-sm text-muted-foreground">
+                Submission speed has been significantly improved across all report types for a faster, smoother experience.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleDismissUpdateDialog} variant="default">
+              Got it
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Title and Create Button */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Dashboard</h1>

@@ -473,14 +473,17 @@ export default function ProjectReportForm({
         body: JSON.stringify(data),
       });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.message || "Error sending report");
+      if (res.status < 200 || res.status >= 300) {
+        throw new Error(`Mail API returned status ${res.status} instead of expected 2xx range. ${result.message ? `Response: ${result.message}` : ''}`);
+      }
       toast.success("Report submitted successfully!");
 
       setSubmittedReportId(newReportId);
       setSubmitDialogOpen(true);
     } catch (error) {
       console.error("Error submitting report:", error);
-      toast.error("Error submitting report");
+      const errorMessage = error instanceof Error ? error.message : "Error submitting report";
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

@@ -423,7 +423,9 @@ export default function PurchaseOrderForm({
       });
 
       const result = await res.json();
-      if (!res.ok) throw new Error(result.message || "Error sending report");
+      if (res.status < 200 || res.status >= 300) {
+        throw new Error(`Mail API returned status ${res.status} instead of expected 2xx range. ${result.message ? `Response: ${result.message}` : ''}`);
+      }
 
       const orderRef = doc(firestore, "orders", purchaseOrder.id).withConverter(
         purchaseOrderConverter
@@ -456,7 +458,8 @@ export default function PurchaseOrderForm({
     } catch (error) {
       setIsUploading(false);
       setUploadProgress("");
-      toast.error("Failed to submit purchase order.");
+      const errorMessage = error instanceof Error ? error.message : "Failed to submit purchase order.";
+      toast.error(errorMessage);
       console.error("Error submitting purchase order:", error);
     } finally {
       setIsSubmitting(false);

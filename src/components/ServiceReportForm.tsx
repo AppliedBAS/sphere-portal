@@ -754,6 +754,16 @@ export default function ServiceReportForm({
       return;
     }
 
+    if (!dispatcher) {
+      toast.error(
+        <span className="text-lg md:text-sm">
+          Please select a dispatcher before submitting.
+        </span>
+      );
+      setIsSubmitting(false);
+      return;
+    }
+
     // Validate service notes - each note must have at least technician time
     const invalidNotes: number[] = [];
     serviceNotesInputs.forEach((note, index) => {
@@ -936,7 +946,9 @@ export default function ServiceReportForm({
         body: JSON.stringify(message),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Error sending report");
+      if (res.status < 200 || res.status >= 300) {
+        throw new Error(`Mail API returned status ${res.status} instead of expected 2xx range. ${data.message ? `Response: ${data.message}` : ''}`);
+      }
       toast.success(
         <span className="text-lg md:text-sm">
           Service report sent successfully!
@@ -946,10 +958,11 @@ export default function ServiceReportForm({
       setSubmittedReportId(id);
       setSubmitDialogOpen(true);
  
-    } catch {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to send service report. Please try again later.";
       toast.error(
         <span className="text-lg md:text-sm">
-          Failed to send service report. Please try again later.
+          {errorMessage}
         </span>
       );
     } finally {
@@ -1248,7 +1261,7 @@ export default function ServiceReportForm({
           )}
           {/* === Dispatcher === */}
           <div className="flex flex-col space-y-2">
-            <Label htmlFor="dispatcher">Dispatcher</Label>
+            <Label htmlFor="dispatcher">Dispatcher *</Label>
             <EmployeeSelect
               employees={adminEmployees}
               loading={loadingEmployees}
