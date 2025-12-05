@@ -243,7 +243,7 @@ export default function Dashboard() {
             <div>
               <h3 className="font-semibold mb-2">Purchase Orders (POs)</h3>
               <p className="text-sm text-muted-foreground">
-                When submitting Purchase Orders, you'll now see real-time notifications showing receipt processing and upload progress, making it easier to track your submission status.
+                When submitting Purchase Orders, you&apos;ll now see real-time notifications showing receipt processing and upload progress, making it easier to track your submission status.
               </p>
             </div>
             <div>
