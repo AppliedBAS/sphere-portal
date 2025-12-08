@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { SunMoonIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import Image from "next/image";
-import LogoDark from "../../../public/logo-dark.png"; // Adjust path as necessary
+import LogoDark from "../../../public/logo-dark.png";
 import LogoLight from "../../../public/logo-light.png";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -40,7 +40,7 @@ export default function LoginPage() {
     );
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-background">
+    <div className="fixed inset-0 flex items-center justify-center bg-background p-4">
       <div className="absolute top-4 right-4">
         <div className="flex items-center gap-2 cursor-pointer" onClick={toggleTheme}>
           <SunMoonIcon className="h-5 w-5" />

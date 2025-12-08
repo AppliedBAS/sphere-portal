@@ -1,3 +1,6 @@
+import ReportViewSkeleton from "@/components/ReportViewSkeleton";
+
 export default function Loading() {
-    return <p>Loading...</p>;
+  return <ReportViewSkeleton detailFieldsCount={9} secondCardType="service" />;
 }
+

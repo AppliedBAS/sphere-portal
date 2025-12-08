@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { firestore } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
@@ -17,13 +17,16 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Pencil } from "lucide-react";
+import { Pencil, Loader2 } from "lucide-react";
+import ReportViewSkeleton from "@/components/ReportViewSkeleton";
 
 const ProjectReportPage = () => {
   const params = useParams();
+  const router = useRouter();
   const idParam = Array.isArray(params.id) ? params.id[0] : params.id;
   const [report, setReport] = useState<ProjectReport | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isNavigatingToEdit, setIsNavigatingToEdit] = useState(false);
   const [authorTechnician, setAuthorTechnician] = useState<Employee | null>(null);
   const [leadTechnician, setLeadTechnician] = useState<Employee | null>(null);
   const [assignedTechnicians, setAssignedTechnicians] = useState<Employee[]>([]);
@@ -65,7 +68,9 @@ const ProjectReportPage = () => {
     fetchReport();
   }, [idParam]);
 
-  if (loading) return <div>Loading…</div>;
+  if (loading) {
+    return <ReportViewSkeleton detailFieldsCount={8} secondCardType="materials" />;
+  }
   if (!report) return <div>Project Report not found.</div>;
 
   return (
@@ -108,19 +113,26 @@ const ProjectReportPage = () => {
 
       <div className="grid grid-cols-1 gap-6">
         {/* Details */}
-        <Card className="p-4 space-y-4 relative text-lg md:text-base">
+        <Card className="p-4 space-y-4 relative">
           <h2 className="text-xl font-semibold mb-4">Report Details</h2>
           {report.draft && (
             <div className="absolute top-4 right-4 z-10">
-              <Link href={`/dashboard/project-reports/${idParam}/edit`} className="block">
-                <button
-                  type="button"
-                  className="p-2 rounded hover:bg-muted transition"
-                  aria-label="Edit report"
-                >
+              <button
+                type="button"
+                disabled={isNavigatingToEdit}
+                onClick={() => {
+                  setIsNavigatingToEdit(true);
+                  router.push(`/dashboard/project-reports/${idParam}/edit`);
+                }}
+                className="p-2 rounded hover:bg-muted transition disabled:opacity-50 disabled:cursor-wait"
+                aria-label="Edit report"
+              >
+                {isNavigatingToEdit ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
                   <Pencil className="w-5 h-5" />
-                </button>
-              </Link>
+                )}
+              </button>
             </div>
           )}
           <div>
@@ -175,19 +187,26 @@ const ProjectReportPage = () => {
         </Card>
 
         {/* Materials & Notes */}
-        <Card className="p-4 relative text-lg md:text-base">
+        <Card className="p-4 relative">
           <h2 className="text-xl font-semibold mb-2">Materials & Notes</h2>
           {report.draft && (
             <div className="absolute top-4 right-4 z-10">
-              <Link href={`/dashboard/project-reports/${idParam}/edit`} className="block">
-                <button
-                  type="button"
-                  className="p-2 rounded hover:bg-muted transition"
-                  aria-label="Edit materials & notes"
-                >
+              <button
+                type="button"
+                disabled={isNavigatingToEdit}
+                onClick={() => {
+                  setIsNavigatingToEdit(true);
+                  router.push(`/dashboard/project-reports/${idParam}/edit`);
+                }}
+                className="p-2 rounded hover:bg-muted transition disabled:opacity-50 disabled:cursor-wait"
+                aria-label="Edit materials & notes"
+              >
+                {isNavigatingToEdit ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
                   <Pencil className="w-5 h-5" />
-                </button>
-              </Link>
+                )}
+              </button>
             </div>
           )}
           <div>

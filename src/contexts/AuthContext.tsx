@@ -5,6 +5,7 @@ import React, {
   useContext,
   useEffect,
   useState,
+  useRef,
   ReactNode,
 } from "react";
 import { auth } from "@/lib/firebase";
@@ -15,6 +16,7 @@ import {
   User,
   signInWithPopup,
   signInWithRedirect,
+  getRedirectResult,
   setPersistence,
   browserLocalPersistence,
   browserSessionPersistence,
@@ -50,6 +52,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const initialCheckDone = useRef(false);
 
   useEffect(() => {
     setPersistence(auth, browserLocalPersistence)
@@ -64,24 +67,53 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []); // run once
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
+    // Check for redirect result on mount
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result) {
+          // User signed in via redirect
+          setUser(result.user);
+        }
+      })
+      .catch((error) => {
+        const err = error as FirebaseError;
+        // Only log non-cancellation errors
+        if (err.code !== "auth/popup-closed-by-user" && err.code !== "auth/cancelled-popup-request") {
+          console.error("Redirect result error:", err);
+        }
+      });
+
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       setUser(fbUser);
 
       if (fbUser?.email) {
-        getEmployeeByEmail(fbUser.email)
-          .then(setFirebaseUser)
-          .catch((error) => {
-            console.error("Error fetching employee data:", error);
-            setFirebaseUser(null);
-          }).finally(() => {
-            setLoading(false);
-          });
+        try {
+          const employee = await getEmployeeByEmail(fbUser.email);
+          setFirebaseUser(employee);
+        } catch (error) {
+          console.error("Error fetching employee data:", error);
+          setFirebaseUser(null);
+        } finally {
+          setLoading(false);
+          initialCheckDone.current = true;
+        }
       } else {
         setFirebaseUser(null);
-        router.replace("/login");
+        setLoading(false);
+        // Only redirect to login after initial check is complete and user is null
+        // This prevents redirecting during the initial auth state restoration
+        if (fbUser === null) {
+          if (initialCheckDone.current) {
+            // Check if we're not already on login page to avoid unnecessary redirects
+            if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+              router.replace("/login");
+            }
+          } else {
+            // Mark initial check as done even if user is null
+            initialCheckDone.current = true;
+          }
+        }
       }
-
-      setLoading(false);
     });
     return () => unsubscribe();
     
@@ -102,6 +134,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         await signInWithRedirect(auth, provider);
       } else {
         console.error("Login failed:", err);
+        
+        // Check if it's the expired client secret error
+        const errorMessage = err.message || "";
+        if (errorMessage.includes("expired") || errorMessage.includes("AADSTS7000222") || err.code === "auth/invalid-credential") {
+          alert("Authentication error: The Microsoft OAuth client secret has expired. Please contact your administrator to update it in Azure Portal and Firebase Console.\n\nTo fix this:\n1. Go to Azure Portal → App registrations\n2. Create a new client secret\n3. Update the secret in Firebase Console → Authentication → Sign-in method → Microsoft");
+        }
       }
       setUser(null);
       setFirebaseUser(null);

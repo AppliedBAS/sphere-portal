@@ -9,6 +9,7 @@ import { useProjectReports } from "@/hooks/useProjectReports";
 import { ProjectReportsTable } from "@/components/project-reports/ProjectReportsTable";
 import { ProjectReportsSearchFilters } from "@/components/project-reports/SearchFilters";
 import { Pagination } from "@/components/Pagination";
+import ReportsSkeleton from "@/components/ReportsSkeleton";
 
 
 export default function ProjectReports() {
@@ -56,7 +57,7 @@ export default function ProjectReports() {
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <ReportsSkeleton tableColumns={7} filterInputs={3} />;
   }
 
   // Mobile card layout is now always shown by default

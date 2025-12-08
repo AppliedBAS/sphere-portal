@@ -475,13 +475,7 @@ export default function PurchaseOrderForm({
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  // Form is always ready - page handles loading state and ensures all data is available
 
   return (
     <>

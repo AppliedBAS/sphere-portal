@@ -12,7 +12,7 @@ import { useEmployees } from "@/hooks/useEmployees";
 
 import { ProjectReport, projectReportConverter, ProjectReportPDFMessage } from "@/models/ProjectReport";
 import { toast } from "sonner";
-import { Project, ProjectHit, projectConverter } from "@/models/Project";
+import { ProjectHit } from "@/models/Project";
 import { getDoc, getDocs, query, where } from "firebase/firestore";
 import { Textarea } from "./ui/textarea";
 import { Label } from "./ui/label";
@@ -45,10 +45,14 @@ import { PurchaseOrder, purchaseOrderConverter } from "@/models/PurchaseOrder";
 
 interface ProjectReportFormProps {
   projectReport?: ProjectReport;
+  project?: ProjectHit | null;
+  authorTechnician?: EmployeeModel | null;
 }
 
 export default function ProjectReportForm({
   projectReport,
+  project: initialProject,
+  authorTechnician: initialAuthorTechnician,
 }: ProjectReportFormProps) {
   const {
     employees,
@@ -57,7 +61,7 @@ export default function ProjectReportForm({
     error: employeesError,
     refetch: refetchEmployees,
   } = useEmployees();
-  const { user, firebaseUser } = useAuth();
+  const { user } = useAuth();
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [leadEmployee, setLeadEmployee] = useState<EmployeeModel | null>(null);
@@ -71,10 +75,10 @@ export default function ProjectReportForm({
     projectReport?.materials || ""
   );
 
-  const [authorTechnician, setAuthorTechnician] = useState<EmployeeModel | null>(null);
+  const [authorTechnician] = useState<EmployeeModel | null>(initialAuthorTechnician || null);
   const [isNewReport, setIsNewReport] = useState<boolean>(!projectReport);
   const [docId, setDocId] = useState<number>(projectReport?.docId || 0);
-  const [project, setProject] = useState<ProjectHit | null>(null);
+  const [project, setProject] = useState<ProjectHit | null>(initialProject || null);
   const [isPreviewing, setIsPreviewing] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [rephraseDialogOpen, setRephraseDialogOpen] = useState<boolean>(false);
@@ -92,41 +96,10 @@ export default function ProjectReportForm({
     async function initForm() {
       if (!projectReport) return;
 
-      if (projectReport.projectDocId) {
-        const projQ = query(
-          collection(firestore, "projects").withConverter(projectConverter),
-          where("doc-id", "==", projectReport.projectDocId)
-        );
-        const projSnap = await getDocs(projQ);
-        if (!projSnap.empty) {
-          const docSnap = projSnap.docs[0];
-          const data = docSnap.data() as Project;
-          setProject({
-            objectID: docSnap.id,
-            docId: data.docId,
-            client: data.client,
-            description: data.description,
-            location: data.location,
-            active: data.active ?? true,
-            balance: data.balance ?? 0,
-            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
-          });
-        }
-      }
-
-      // Load author technician from projectReport
-      if (projectReport.authorTechnicianRef) {
-        const empSnap = await getDoc(
-          projectReport.authorTechnicianRef.withConverter(employeeConverter)
-        );
-        if (empSnap.exists()) {
-          const emp = empSnap.data() as EmployeeModel;
-          setAuthorTechnician({
-            ...emp,
-            id: empSnap.id,
-          });
-        }
-      }
+      // Project and authorTechnician are loaded by the page, so we only need to load:
+      // - leadEmployee
+      // - assignedTechnicians
+      // - form field values
 
       if (projectReport.leadTechnicianRef) {
         const employeeSnap = await getDoc(
@@ -171,12 +144,6 @@ export default function ProjectReportForm({
 
     initForm();
   }, [projectReport]);
-
-  useEffect(() => {
-    if (firebaseUser) {
-      setAuthorTechnician(firebaseUser);
-    }
-  }, [firebaseUser]);
 
   const handleAddTechnician = (emp: EmployeeModel) => {
     if (!assignedTechnicians.some((existing) => existing.id === emp.id)) {
@@ -518,14 +485,7 @@ export default function ProjectReportForm({
     setRephraseDialogOpen(false);
   };
 
-  // show loader until auth user loaded
-  if (!user || !authorTechnician || (!project && projectReport)) {
-    return (
-      <div className="flex items-center justify-center">
-        <Loader2 className="animate-spin" />
-      </div>
-    );
-  }
+  // Form is always ready - page handles loading state and ensures all data is available
 
   // Preview handler: generate PDF preview
   const handlePreview = async () => {
@@ -582,17 +542,11 @@ export default function ProjectReportForm({
     window.location.href = `/dashboard/project-reports/${submittedReportId!}`;
   };
 
+  // Disable form interactions during submit/save/preview, but don't show skeleton
+  // Page handles loading state
+
   return (
     <>
-      {/* Fixed Loading Indicator */}
-      {(isSubmitting || isSaving || isPreviewing) && (
-        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 bg-background border rounded-lg shadow-lg px-4 py-3">
-          <Loader2 className="animate-spin h-5 w-5 text-primary" />
-          <span className="text-sm font-medium">
-            {isSubmitting ? "Submitting..." : isSaving ? "Saving..." : "Previewing..."}
-          </span>
-        </div>
-      )}
       {/* AI Rephrase Dialog */}
       <Dialog open={rephraseDialogOpen} onOpenChange={setRephraseDialogOpen}>
         <DialogContent>

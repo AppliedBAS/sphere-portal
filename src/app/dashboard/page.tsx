@@ -20,7 +20,8 @@ import type { ProjectReport } from "@/models/ProjectReport";
 import type { ServiceReport } from "@/models/ServiceReport";
 import type { PurchaseOrder } from "@/models/PurchaseOrder";
 import { DashboardCard } from "@/components/DashboardCard";
-import { CreditCardIcon, ClipboardList, FolderIcon } from "lucide-react";
+import DashboardSkeleton from "@/components/DashboardSkeleton";
+import { CreditCardIcon, ClipboardList, FolderIcon, Loader2 } from "lucide-react";
 
 export default function Dashboard() {
   const router = useRouter();
@@ -31,6 +32,7 @@ export default function Dashboard() {
   }>({ projectReports: [], serviceReports: [], purchaseOrders: [] });
   const [loading, setLoading] = useState(true);
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+  const [creatingReportType, setCreatingReportType] = useState<string | null>(null);
   
   // Unique version/ID for this update dialog - increment this for future updates
   const UPDATE_DIALOG_VERSION = "2025-update-1";
@@ -47,12 +49,26 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
+    // Track which subscriptions have received their first snapshot
+    const loadedFlags = {
+      projectReports: false,
+      serviceReports: false,
+      purchaseOrders: false,
+    };
+
+    const checkAllLoaded = () => {
+      if (loadedFlags.projectReports && loadedFlags.serviceReports && loadedFlags.purchaseOrders) {
+        setLoading(false);
+      }
+    };
+
     const unsubscribePR = onSnapshot(
       query(
         collection(firestore, "project reports"),
         where("draft", "==", true)
       ),
       (snapshot) => {
+        loadedFlags.projectReports = true;
         setData((prevData) => ({
           ...prevData,
           projectReports: snapshot.docs.map((d) => {
@@ -74,12 +90,14 @@ export default function Dashboard() {
             } as ProjectReport;
           }),
         }));
+        checkAllLoaded();
       }
     );
 
     const unsubscribeSR = onSnapshot(
       query(collection(firestore, "reports"), where("draft", "==", true)),
       (snapshot) => {
+        loadedFlags.serviceReports = true;
         setData((prevData) => ({
           ...prevData,
           serviceReports: snapshot.docs.map((d) => {
@@ -104,12 +122,14 @@ export default function Dashboard() {
             } as ServiceReport;
           }),
         }));
+        checkAllLoaded();
       }
     );
 
     const unsubscribePO = onSnapshot(
       query(collection(firestore, "orders"), where("status", "==", "OPEN")),
       (snapshot) => {
+        loadedFlags.purchaseOrders = true;
         setData((prevData) => ({
           ...prevData,
           purchaseOrders: snapshot.docs.map((d) => {
@@ -129,10 +149,9 @@ export default function Dashboard() {
             } as PurchaseOrder;
           }),
         }));
+        checkAllLoaded();
       }
     );
-
-    setLoading(false);
 
     return () => {
       unsubscribePR();
@@ -212,7 +231,7 @@ export default function Dashboard() {
   };
 
   if (loading) {
-    return <p>Loading...</p>;
+    return <DashboardSkeleton />;
   }
 
   return (
@@ -277,21 +296,54 @@ export default function Dashboard() {
             <div className="grid gap-3 py-4">
               <Button
                 variant="outline"
-                onClick={() => router.push("/dashboard/service-reports/create")}
+                disabled={creatingReportType !== null}
+                onClick={() => {
+                  setCreatingReportType("service-report");
+                  router.push("/dashboard/service-reports/create");
+                }}
               >
-                Service Report
+                {creatingReportType === "service-report" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  "Service Report"
+                )}
               </Button>
               <Button
                 variant="outline"
-                onClick={() => router.push("/dashboard/project-reports/create")}
+                disabled={creatingReportType !== null}
+                onClick={() => {
+                  setCreatingReportType("project-report");
+                  router.push("/dashboard/project-reports/create");
+                }}
               >
-                Project Report
+                {creatingReportType === "project-report" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  "Project Report"
+                )}
               </Button>
               <Button
                 variant="outline"
-                onClick={() => router.push("/dashboard/purchase-orders/create")}
+                disabled={creatingReportType !== null}
+                onClick={() => {
+                  setCreatingReportType("purchase-order");
+                  router.push("/dashboard/purchase-orders/create");
+                }}
               >
-                Purchase Order
+                {creatingReportType === "purchase-order" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  "Purchase Order"
+                )}
               </Button>
             </div>
             <DialogFooter>

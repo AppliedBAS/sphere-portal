@@ -1,3 +1,5 @@
+import ReportsSkeleton from "@/components/ReportsSkeleton";
+
 export default function Loading() {
-    return <p>Loading...</p>;
+    return <ReportsSkeleton tableColumns={7} filterInputs={3} />;
 }

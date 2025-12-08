@@ -70,6 +70,7 @@ import { PurchaseOrder, purchaseOrderConverter } from "@/models/PurchaseOrder";
 
 interface ServiceReportFormProps {
   serviceReport?: ServiceReport;
+  authorTechnician?: Employee | null;
 }
 
 interface ServiceNoteInput {
@@ -84,6 +85,7 @@ interface ServiceNoteInput {
 
 export default function ServiceReportForm({
   serviceReport,
+  authorTechnician: initialAuthorTechnician,
 }: ServiceReportFormProps) {
   const {
     employees,
@@ -96,7 +98,7 @@ export default function ServiceReportForm({
   // Filter employees to only show admins for dispatcher selection
   const adminEmployees = employees.filter((emp) => emp.role === "admin");
 
-  const { user, firebaseUser } = useAuth();
+  const { user } = useAuth();
   const [rephraseDialogOpen, setRephraseDialogOpen] = useState(false);
   const [currentRephraseIndex, setCurrentRephraseIndex] = useState<
     number | null
@@ -113,8 +115,8 @@ export default function ServiceReportForm({
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isPreviewing, setIsPreviewing] = useState<boolean>(false);
 
-  const [authorTechnician, setAuthorTechnician] = useState<Employee | null>(
-    null
+  const [authorTechnician] = useState<Employee | null>(
+    initialAuthorTechnician || null
   );
   const [assignedTechnician, setAssignedTechnician] = useState<Employee | null>(
     null
@@ -201,28 +203,16 @@ export default function ServiceReportForm({
     if (linkPurchaseOrders) fetchPurchaseOrders();
   }, [linkPurchaseOrders, docId]);
 
-  useEffect(() => {
-    if (firebaseUser) {
-      setAuthorTechnician(firebaseUser);
-    }
-  }, [firebaseUser]);
+  // Author technician is loaded by the page, no need to set it from firebaseUser
 
   useEffect(() => {
     async function initForm() {
       if (!serviceReport) return;
-      // Populate authorTechnician from a DocumentReference, if present
-      if (serviceReport.authorTechnicianRef) {
-        const empRef =
-          serviceReport.authorTechnicianRef.withConverter(employeeConverter);
-        const empSnap = await getDoc(empRef);
-        if (empSnap.exists()) {
-          setAuthorTechnician(empSnap.data() as Employee);
-        } else {
-          console.info(
-            "Author technician not found in Firestore, using current user"
-          );
-        }
-      }
+      // Author technician is loaded by the page, so we only need to load:
+      // - assignedTechnician
+      // - dispatcher
+      // - client and building
+      // - form field values
 
       if (serviceReport.assignedTechnicianRef) {
         const empRef =
@@ -1178,25 +1168,10 @@ export default function ServiceReportForm({
     setEmails((prevEmails) => [...prevEmails, ""]);
   }
 
-  if (!user || !authorTechnician) {
-    return (
-      <div className="flex items-center justify-center">
-        <Loader2 className="animate-spin" />
-      </div>
-    );
-  }
+  // Form is always ready - page handles loading state and ensures all data is available
 
   return (
     <>
-      {/* Fixed Loading Indicator */}
-      {(isSubmitting || isSaving || isPreviewing) && (
-        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 bg-background border rounded-lg shadow-lg px-4 py-3">
-          <Loader2 className="animate-spin h-5 w-5 text-primary" />
-          <span className="text-sm font-medium">
-            {isSubmitting ? "Submitting..." : isSaving ? "Saving..." : "Previewing..."}
-          </span>
-        </div>
-      )}
       {/* AI Rephrase Dialog */}
       <Dialog open={rephraseDialogOpen} onOpenChange={setRephraseDialogOpen}>
         <DialogContent>

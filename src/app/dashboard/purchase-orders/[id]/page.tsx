@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { firestore } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
@@ -17,15 +17,18 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Pencil } from "lucide-react";
+import { Pencil, Loader2 } from "lucide-react";
 import { listReceiptFiles } from "@/lib/storage";
 import { FileText } from "lucide-react";
+import ReportViewSkeleton from "@/components/ReportViewSkeleton";
 
 const PurchaseOrderDetailPage = () => {
   const params = useParams();
+  const router = useRouter();
   const idParam = Array.isArray(params.id) ? params.id[0] : params.id;
   const [order, setOrder] = useState<PurchaseOrder | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isNavigatingToEdit, setIsNavigatingToEdit] = useState(false);
   const [technician, setTechnician] = useState<Employee | null>(null);
   const [receipts, setReceipts] = useState<{ name: string; type: string; url: string }[]>([]);
 
@@ -52,7 +55,9 @@ const PurchaseOrderDetailPage = () => {
     fetchOrder();
   }, [idParam]);
 
-  if (loading) return <div>Loading…</div>;
+  if (loading) {
+    return <ReportViewSkeleton detailFieldsCount={9} secondCardType="materials" />;
+  }
   if (!order) return <div>Purchase Order not found.</div>;
 
   return (
@@ -103,19 +108,26 @@ const PurchaseOrderDetailPage = () => {
 
       <div className="grid grid-cols-1 gap-6">
         {/* Details */}
-        <Card className="p-4 space-y-4 relative text-lg md:text-base">
+        <Card className="p-4 space-y-4 relative">
           <h2 className="text-xl font-semibold mb-4">Order Details</h2>
           {order.status?.toLowerCase() === "open" && (
             <div className="absolute top-4 right-4 z-10">
-              <Link href={`/dashboard/purchase-orders/${idParam}/edit`} className="block">
-                <button
-                  type="button"
-                  className="p-2 rounded hover:bg-muted transition"
-                  aria-label="Edit order"
-                >
+              <button
+                type="button"
+                disabled={isNavigatingToEdit}
+                onClick={() => {
+                  setIsNavigatingToEdit(true);
+                  router.push(`/dashboard/purchase-orders/${idParam}/edit`);
+                }}
+                className="p-2 rounded hover:bg-muted transition disabled:opacity-50 disabled:cursor-wait"
+                aria-label="Edit order"
+              >
+                {isNavigatingToEdit ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
                   <Pencil className="w-5 h-5" />
-                </button>
-              </Link>
+                )}
+              </button>
             </div>
           )}
           <div>

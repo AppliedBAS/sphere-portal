@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { firestore } from "@/lib/firebase";
 import {
@@ -22,15 +22,18 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, Pencil } from "lucide-react";
+import { CreditCard, Pencil, Loader2 } from "lucide-react";
 import { employeeConverter, Employee } from "@/models/Employee";
+import ReportViewSkeleton from "@/components/ReportViewSkeleton";
 import { PurchaseOrder, purchaseOrderConverter } from "@/models/PurchaseOrder";
 import { ListCard } from "@/components/ListCard";
 
 const ServiceReportViewPage = () => {
   const { id } = useParams();
+  const router = useRouter();
   const [report, setReport] = useState<ServiceReport | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isNavigatingToEdit, setIsNavigatingToEdit] = useState(false);
   const [authorTechnician, setAuthorTechnician] = useState<Employee | null>(
     null
   );
@@ -100,7 +103,9 @@ const ServiceReportViewPage = () => {
     fetchReport();
   }, [id]);
 
-  if (loading) return <div>Loading…</div>;
+  if (loading) {
+    return <ReportViewSkeleton detailFieldsCount={9} secondCardType="service" />;
+  }
   if (!report) return <div>Service Report not found.</div>;
 
   return (
@@ -150,18 +155,22 @@ const ServiceReportViewPage = () => {
           {report.draft && (
             <div className="absolute top-4 right-4 z-10">
               {report.draft && (
-                <Link
-                  href={`/dashboard/service-reports/${id}/edit`}
-                  className="block"
+                <button
+                  type="button"
+                  disabled={isNavigatingToEdit}
+                  onClick={() => {
+                    setIsNavigatingToEdit(true);
+                    router.push(`/dashboard/service-reports/${id}/edit`);
+                  }}
+                  className="p-2 rounded hover:bg-muted transition disabled:opacity-50 disabled:cursor-wait"
+                  aria-label="Edit main info"
                 >
-                  <button
-                    type="button"
-                    className="p-2 rounded hover:bg-muted transition"
-                    aria-label="Edit main info"
-                  >
+                  {isNavigatingToEdit ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
                     <Pencil className="w-5 h-5" />
-                  </button>
-                </Link>
+                  )}
+                </button>
               )}
             </div>
           )}
@@ -286,24 +295,28 @@ const ServiceReportViewPage = () => {
         </Card>
 
         {/* Right: Service Notes */}
-        <Card className="p-4 relative text-lg md:text-base">
+        <Card className="p-4 relative">
           <h2 className="text-xl font-semibold mb-2">Service Notes</h2>
           {/* Edit icon for service notes */}
           {report.draft && (
             <div className="absolute top-4 right-4 z-10">
               {report.draft && (
-                <Link
-                  href={`/dashboard/service-reports/${id}/edit`}
-                  className="block"
+                <button
+                  type="button"
+                  disabled={isNavigatingToEdit}
+                  onClick={() => {
+                    setIsNavigatingToEdit(true);
+                    router.push(`/dashboard/service-reports/${id}/edit`);
+                  }}
+                  className="p-2 rounded hover:bg-muted transition disabled:opacity-50 disabled:cursor-wait"
+                  aria-label="Edit service notes"
                 >
-                  <button
-                    type="button"
-                    className="p-2 rounded hover:bg-muted transition"
-                    aria-label="Edit service notes"
-                  >
+                  {isNavigatingToEdit ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
                     <Pencil className="w-5 h-5" />
-                  </button>
-                </Link>
+                  )}
+                </button>
               )}
             </div>
           )}

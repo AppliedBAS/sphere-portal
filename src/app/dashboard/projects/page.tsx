@@ -9,6 +9,7 @@ import { useProjects } from "@/hooks/useProjects";
 import { ProjectsTable } from "@/components/projects/ProjectsTable";
 import { ProjectsSearchFilters } from "@/components/projects/SearchFilters";
 import { Pagination } from "@/components/Pagination";
+import ReportsSkeleton from "@/components/ReportsSkeleton";
 
 export default function Projects() {
   const router = useRouter();
@@ -61,7 +62,7 @@ export default function Projects() {
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <ReportsSkeleton tableColumns={7} filterInputs={2} />;
   }
 
   return (

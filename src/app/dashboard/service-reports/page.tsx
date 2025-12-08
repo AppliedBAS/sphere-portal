@@ -16,6 +16,7 @@ import { ServiceReportsTable } from "@/components/service-reports/ServiceReports
 import { ServiceReportsSearchFilters } from "@/components/service-reports/SearchFilters";
 import { Pagination } from "@/components/Pagination";
 import { useServiceReports } from "@/hooks/useServiceReports";
+import ReportsSkeleton from "@/components/ReportsSkeleton";
 
 export default function ServiceReports() {
   const router = useRouter();
@@ -76,7 +77,7 @@ export default function ServiceReports() {
 
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <ReportsSkeleton tableColumns={6} filterInputs={4} />;
   }
 
   return (
@@ -113,32 +114,35 @@ export default function ServiceReports() {
         ))}
       </div>
 
-      <ServiceReportsSearchFilters
-        qSearch={qSearch}
-        qAmountRange={[0, 100000]}
-        qDraft={qDraft}
-        qRemote={qRemote}
-        qWarranty={qWarranty}
-        onSearchChange={handleSearchChange}
-        onAmountRangeChange={handleAmountRangeChange}
-        onDraftChange={handleDraftChange}
-        onWarrantyChange={handleWarrantyChange}
-        onFilterReset={handleFilterReset}
-      />
+      {/* Desktop/table layout for md+ screens */}
+      <div className="hidden md:block">
+        <ServiceReportsSearchFilters
+          qSearch={qSearch}
+          qAmountRange={[0, 100000]}
+          qDraft={qDraft}
+          qRemote={qRemote}
+          qWarranty={qWarranty}
+          onSearchChange={handleSearchChange}
+          onAmountRangeChange={handleAmountRangeChange}
+          onDraftChange={handleDraftChange}
+          onWarrantyChange={handleWarrantyChange}
+          onFilterReset={handleFilterReset}
+        />
 
-      <ServiceReportsTable
-        reports={reports}
-      />
+        <ServiceReportsTable
+          reports={reports}
+        />
 
-      <Pagination
-        qPage={qPage}
-        qPageSize={qPageSize}
-        ordersCount={reportsCount}
-        totalCount={totalCount}
-        totalPages={totalPages}
-        onPageChange={handlePageChange}
-        onPageSizeChange={handlePageSizeChange}
-      />
+        <Pagination
+          qPage={qPage}
+          qPageSize={qPageSize}
+          ordersCount={reportsCount}
+          totalCount={totalCount}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
+      </div>
     </div>
   );
 }

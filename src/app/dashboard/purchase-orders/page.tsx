@@ -17,6 +17,7 @@ import { SearchFilters } from "@/components/purchase-orders/SearchFilters";
 import { PurchaseOrdersTable } from "@/components/purchase-orders/PurchaseOrdersTable";
 import { Pagination } from "@/components/Pagination";
 import { MAX_AMOUNT } from "@/lib/utils";
+import ReportsSkeleton from "@/components/ReportsSkeleton";
 
 export default function PurchaseOrders() {
   const router = useRouter();
@@ -84,7 +85,7 @@ export default function PurchaseOrders() {
     return params;
   };
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <ReportsSkeleton tableColumns={6} filterInputs={5} />;
 
   return (
     <div className="space-y-4">
@@ -122,35 +123,38 @@ export default function PurchaseOrders() {
           ))}
       </div>
 
-      {/* Wrap filters in a form so Enter triggers submit */}
-      <SearchFilters
-        qDescription={qDescription}
-        qMinAmount={qMinAmount}
-        qMaxAmount={qMaxAmount}
-        qStatus={qStatus}
-        qVendor={qVendor}
-        qSrDocId={qSrDocId}
-        qProjectDocId={qProjectDocId}
-        onDescriptionChange={handleDescriptionChange}
-        onAmountChange={handleAmountChange}
-        onStatusChange={handleStatusChange}
-        onVendorChange={handleVendorChange}
-        onFilterReset={handleFilterReset}
-      />
+      {/* Desktop/table layout for md+ screens */}
+      <div className="hidden md:block">
+        {/* Wrap filters in a form so Enter triggers submit */}
+        <SearchFilters
+          qDescription={qDescription}
+          qMinAmount={qMinAmount}
+          qMaxAmount={qMaxAmount}
+          qStatus={qStatus}
+          qVendor={qVendor}
+          qSrDocId={qSrDocId}
+          qProjectDocId={qProjectDocId}
+          onDescriptionChange={handleDescriptionChange}
+          onAmountChange={handleAmountChange}
+          onStatusChange={handleStatusChange}
+          onVendorChange={handleVendorChange}
+          onFilterReset={handleFilterReset}
+        />
 
-      <PurchaseOrdersTable
-        orders={orders}
-      />
+        <PurchaseOrdersTable
+          orders={orders}
+        />
 
-      <Pagination
-        qPage={qPage}
-        qPageSize={qPageSize}
-        ordersCount={ordersCount}
-        totalCount={totalCount}
-        totalPages={totalPages}
-        onPageChange={handlePageChange}
-        onPageSizeChange={handlePageSizeChange}
-      />
+        <Pagination
+          qPage={qPage}
+          qPageSize={qPageSize}
+          ordersCount={ordersCount}
+          totalCount={totalCount}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
+      </div>
     </div>
   );
 }

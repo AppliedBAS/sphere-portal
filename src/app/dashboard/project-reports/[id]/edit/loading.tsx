@@ -1,3 +1,6 @@
+import EditPageSkeleton from "@/components/EditPageSkeleton";
+
 export default function Loading() {
-    return <p>Loading...</p>;
+  return <EditPageSkeleton titleWidth="md" />;
 }
+
