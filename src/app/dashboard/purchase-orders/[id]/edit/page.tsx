@@ -1,15 +1,9 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { doc, getDoc, getDocs, query, collection, where } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
 import { PurchaseOrder, purchaseOrderConverter } from "@/models/PurchaseOrder";
-import { Vendor, VendorHit } from "@/models/Vendor";
-import { Employee, employeeConverter } from "@/models/Employee";
-import { Project, ProjectHit, projectConverter } from "@/models/Project";
-import { ServiceReport } from "@/models/ServiceReport";
-import { fetchVendorByName } from "@/services/orderService";
-import { fetchDraftServiceReports } from "@/services/reportService";
 import PurchaseOrderForm from "@/components/PurchaseOrderForm";
 import {
   Breadcrumb,

@@ -69,7 +69,6 @@ export default function PurchaseOrderForm({
   );
   const [selectedServiceReport, setSelectedServiceReport] =
     useState<ServiceReport | null>(null);
-  const [loading, setLoading] = useState(false);
   const [submittedOrderId, setSubmittedOrderId] = useState<string | null>(null);
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -169,8 +168,6 @@ export default function PurchaseOrderForm({
     async function initForm() {
       if (!purchaseOrder) return;
 
-      setLoading(true);
-
       if (purchaseOrder.vendor) {
         const vendorData: Vendor | null = await fetchVendorByName(
           purchaseOrder.vendor
@@ -232,7 +229,6 @@ export default function PurchaseOrderForm({
         setCategoryType("other");
       }
       setServiceReports(draftSR);
-      setLoading(false);
     }
     initForm();
   }, [purchaseOrder]);
