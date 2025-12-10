@@ -46,7 +46,7 @@ import { PurchaseOrder, purchaseOrderConverter } from "@/models/PurchaseOrder";
 interface ProjectReportFormProps {
   projectReport?: ProjectReport;
   project?: ProjectHit | null;
-  authorTechnician?: EmployeeModel | null;
+  authorTechnician: EmployeeModel;
 }
 
 export default function ProjectReportForm({
@@ -75,7 +75,7 @@ export default function ProjectReportForm({
     projectReport?.materials || ""
   );
 
-  const [authorTechnician] = useState<EmployeeModel | null>(initialAuthorTechnician || null);
+  const [authorTechnician] = useState<EmployeeModel>(initialAuthorTechnician);
   const [isNewReport, setIsNewReport] = useState<boolean>(!projectReport);
   const [docId, setDocId] = useState<number>(projectReport?.docId || 0);
   const [project, setProject] = useState<ProjectHit | null>(initialProject || null);
@@ -229,19 +229,14 @@ export default function ProjectReportForm({
 
   const handleSaveDraft = async () => {
     setIsSaving(true);
-    if (!user ) {
-      toast.error("User is required");
-      setIsSaving(false);
-      return;
-    }
-    if (!authorTechnician) {
-      toast.error("Author technician is required");
+    if (!user) {
+      toast.error("You must be logged in to save a draft.");
       setIsSaving(false);
       return;
     }
 
     if (!project) {
-      toast.error("Project is required");
+      toast.error("Project is required.");
       setIsSaving(false);
       return;
     }
@@ -330,8 +325,13 @@ export default function ProjectReportForm({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    if (!user || !authorTechnician || !project) {
-      toast.error("All fields are required");
+    if (!user) {
+      toast.error("You must be logged in to submit a project report.");
+      setIsSubmitting(false);
+      return;
+    }
+    if (!project) {
+      toast.error("Project is required.");
       setIsSubmitting(false);
       return;
     }
@@ -490,8 +490,8 @@ export default function ProjectReportForm({
   // Preview handler: generate PDF preview
   const handlePreview = async () => {
     setIsPreviewing(true);
-    if (!user || !authorTechnician || !project) {
-      toast.error("All fields are required for preview");
+    if (!user || !project) {
+      toast.error("User and project are required for preview.");
       setIsPreviewing(false);
       return;
     }
@@ -670,6 +670,9 @@ export default function ProjectReportForm({
               }}
               placeholder="Add Technician..."
             />
+            <p className="text-base sm:text-sm text-muted-foreground mb-1">
+              Optional. Add other technicians who worked on this project.
+            </p>
           </div>
 
           <div className="flex flex-col space-y-2">

@@ -2,6 +2,7 @@ import React from "react";
 import type { Metadata } from "next";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import DashboardAuthGuard from "@/components/DashboardAuthGuard";
 
 export const metadata: Metadata = {
   title: "Dashboard | Sphere Portal",
@@ -10,15 +11,17 @@ export const metadata: Metadata = {
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
-      <SidebarProvider>
-        <AppSidebar />
-        <main className="flex-1 h-screen w-full">
-          <SidebarTrigger className="p-4 m-2"/>
+    <SidebarProvider>
+      <AppSidebar />
+      <main className="flex-1 h-screen w-full">
+        <SidebarTrigger className="p-4 m-2"/>
+        <DashboardAuthGuard>
           <div className="px-4 md:px-8 py-4">
             {children}
           </div>
-        </main>
-      </SidebarProvider>
+        </DashboardAuthGuard>
+      </main>
+    </SidebarProvider>
   );
 };
 

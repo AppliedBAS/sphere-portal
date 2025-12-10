@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
 import { Employee } from "@/models/Employee";
-import { useAuth } from "@/contexts/AuthContext";
 import { CommandList } from "cmdk";
 
 interface EmployeeSelectProps {
@@ -40,16 +39,11 @@ export default function EmployeeSelect({
 }: EmployeeSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const { user } = useAuth();
 
-  // Only filter once employees arrive, excluding current user, and sort alphabetically by name
+  // Filter and sort employees alphabetically by name
   const filtered = useMemo(() => {
-    // Exclude the logged-in user by email
-    const base = employees.filter((e) =>
-      user?.email ? e.email !== user.email : true
-    );
     // Sort alphabetically by name
-    const sorted = base.sort((a, b) => a.name.localeCompare(b.name));
+    const sorted = employees.sort((a, b) => a.name.localeCompare(b.name));
     if (!query) return sorted;
     const lower = query.toLowerCase();
     return sorted.filter(
@@ -57,7 +51,7 @@ export default function EmployeeSelect({
         e.name.toLowerCase().includes(lower) ||
         e.email.toLowerCase().includes(lower)
     );
-  }, [employees, query, user?.email]);
+  }, [employees, query]);
 
   // Prevent background scroll when popover is open
   useEffect(() => {

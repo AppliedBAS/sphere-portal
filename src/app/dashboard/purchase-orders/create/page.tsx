@@ -1,9 +1,19 @@
+"use client";
+
 import ReserveOrderForm from "@/components/ReserveOrderForm";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import Link from "next/link";
 import React from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import EditPageSkeleton from "@/components/EditPageSkeleton";
 
 const CreatePurchaseOrder: React.FC = () => {
+  const { user, loading } = useAuth();
+
+  if (loading || !user) {
+    return <EditPageSkeleton titleWidth="md" />;
+  }
+
   return (
     <div className="flex flex-col space-y-6 pb-8">
       {/* Breadcrumb */}

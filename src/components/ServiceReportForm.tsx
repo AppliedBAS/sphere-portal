@@ -70,7 +70,7 @@ import { PurchaseOrder, purchaseOrderConverter } from "@/models/PurchaseOrder";
 
 interface ServiceReportFormProps {
   serviceReport?: ServiceReport;
-  authorTechnician?: Employee | null;
+  authorTechnician: Employee;
 }
 
 interface ServiceNoteInput {
@@ -95,9 +95,6 @@ export default function ServiceReportForm({
     refetch: refetchEmployees,
   } = useEmployees();
 
-  // Filter employees to only show admins for dispatcher selection
-  const adminEmployees = employees.filter((emp) => emp.role === "admin");
-
   const { user } = useAuth();
   const [rephraseDialogOpen, setRephraseDialogOpen] = useState(false);
   const [currentRephraseIndex, setCurrentRephraseIndex] = useState<
@@ -115,9 +112,10 @@ export default function ServiceReportForm({
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isPreviewing, setIsPreviewing] = useState<boolean>(false);
 
-  const [authorTechnician] = useState<Employee | null>(
-    initialAuthorTechnician || null
-  );
+  const [authorTechnician] = useState<Employee>(initialAuthorTechnician);
+
+  // Filter employees to only show admins for dispatcher selection
+  const adminEmployees = employees.filter((emp) => emp.role === "admin");
   const [assignedTechnician, setAssignedTechnician] = useState<Employee | null>(
     null
   );
@@ -371,7 +369,7 @@ export default function ServiceReportForm({
   };
 
   const handleRephrase = async (index: number) => {
-    if (!user || !authorTechnician) {
+    if (!user) {
       toast.error(
         <span className="text-lg md:text-sm">
           You must be logged in to rephrase service notes.
@@ -444,16 +442,6 @@ export default function ServiceReportForm({
       return;
     }
 
-    if (!authorTechnician) {
-      toast.error(
-        <span className="text-lg md:text-sm">
-          Error loading author technician. Please try again later.
-        </span>
-      );
-      setIsSaving(false);
-      return;
-    }
-
     if (!client) {
       toast.error(
         <span className="text-lg md:text-sm">
@@ -496,7 +484,7 @@ export default function ServiceReportForm({
           authorTechnicianRef: doc(
             firestore,
             "employees",
-            authorTechnician!.id
+            authorTechnician.id
           ),
           assignedTechnicianRef: assignedTechnician
             ? doc(firestore, "employees", assignedTechnician.id)
@@ -687,7 +675,7 @@ export default function ServiceReportForm({
     const technicianEmails: string[] = [];
     if (dispatcher?.email) technicianEmails.push(dispatcher.email);
     if (assignedTechnician?.email) technicianEmails.push(assignedTechnician.email);
-    if (authorTechnician?.email) technicianEmails.push(authorTechnician.email);
+    if (authorTechnician.email) technicianEmails.push(authorTechnician.email);
     // Remove duplicates
     return [...new Set(technicianEmails)];
   }
@@ -724,15 +712,6 @@ export default function ServiceReportForm({
       return;
     }
 
-    if (!authorTechnician) {
-      toast.error(
-        <span className="text-lg md:text-sm">
-          Error loading author technician. Try again later.
-        </span>
-      );
-      setIsSubmitting(false);
-      return;
-    }
 
     if (!client || !building) {
       toast.error(
@@ -789,7 +768,7 @@ export default function ServiceReportForm({
       const newReport: ServiceReport = {
         id: crypto.randomUUID(),
         docId: currentDocId!,
-        authorTechnicianRef: doc(firestore, "employees", authorTechnician!.id),
+        authorTechnicianRef: doc(firestore, "employees", authorTechnician.id),
         assignedTechnicianRef: assignedTechnician
           ? doc(firestore, "employees", assignedTechnician.id)
           : null,
@@ -1048,14 +1027,6 @@ export default function ServiceReportForm({
         toast.error(
           <span className="text-lg md:text-sm">
             Please select a client and building
-          </span>
-        );
-        return;
-      }
-      if (!authorTechnician) {
-        toast.error(
-          <span className="text-lg md:text-sm">
-            Error loading author technician. Try again later.
           </span>
         );
         return;

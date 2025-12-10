@@ -1,9 +1,19 @@
+"use client";
+
 import ServiceReportForm from "@/components/ServiceReportForm";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import Link from "next/link";
 import React from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import EditPageSkeleton from "@/components/EditPageSkeleton";
 
 const CreateServiceReport: React.FC = () => {
+  const { user, firebaseUser, loading } = useAuth();
+
+  if (loading || !user || !firebaseUser) {
+    return <EditPageSkeleton titleWidth="md" />;
+  }
+
   return (
     <div className="flex flex-col space-y-6 pb-8">
       {/* Breadcrumb */}
@@ -29,7 +39,7 @@ const CreateServiceReport: React.FC = () => {
       <header className="mb-6">
         <h1 className="text-2xl font-bold">Create Service Report</h1>
       </header>
-      <ServiceReportForm />
+      <ServiceReportForm authorTechnician={firebaseUser} />
     </div>
   );
 };
