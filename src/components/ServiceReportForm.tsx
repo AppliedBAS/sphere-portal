@@ -1,7 +1,10 @@
 "use client";
 
 import openAIClient from "@/lib/openai";
-import { useState, useEffect, FormEvent } from "react";
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import EmployeeSelect from "@/components/EmployeeSelect";
 import { Employee, employeeConverter } from "@/models/Employee";
 import { Button } from "@/components/ui/button";
@@ -38,6 +41,14 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 
 // ShadCN Select imports:
 import {
@@ -73,15 +84,41 @@ interface ServiceReportFormProps {
   authorTechnician: Employee;
 }
 
-interface ServiceNoteInput {
-  date: Date;
-  technicianTime: string;
-  technicianOvertime: string;
-  helperTime: string;
-  helperOvertime: string;
-  remoteWork: string;
-  notes: string;
-}
+// Zod schema for service note
+const serviceNoteSchema = z.object({
+  date: z.date(),
+  technicianTime: z.string(),
+  technicianOvertime: z.string(),
+  helperTime: z.string(),
+  helperOvertime: z.string(),
+  remoteWork: z.enum(["Y", "N"]),
+  notes: z.string().min(1, "Service notes are required"),
+});
+
+// Zod schema for the form
+const serviceReportFormSchema = z.object({
+  dispatcherId: z.string().nullable().optional(),
+  assignedTechnicianId: z.string().nullable().optional(),
+  clientId: z.string().min(1, "Client is required"),
+  buildingServiceAddress1: z.string().min(1, "Building is required"),
+  warranty: z.boolean(),
+  linkPurchaseOrders: z.boolean(),
+  materialNotes: z.string(),
+  serviceNotes: z.array(serviceNoteSchema).min(1, "At least one service note is required"),
+  emails: z.array(z.string().email("Invalid email address").or(z.literal(""))),
+}).refine((data) => {
+  // Validate that at least one service note has technician time > 0
+  return data.serviceNotes.some((note) => {
+    const techTime = parseFloat(note.technicianTime) || 0;
+    const helperTime = parseFloat(note.helperTime) || 0;
+    return techTime > 0 || helperTime > 0;
+  });
+}, {
+  message: "At least one service note must have technician or helper time greater than 0",
+  path: ["serviceNotes"],
+});
+
+type ServiceReportFormValues = z.infer<typeof serviceReportFormSchema>;
 
 export default function ServiceReportForm({
   serviceReport,
@@ -96,45 +133,29 @@ export default function ServiceReportForm({
   } = useEmployees();
 
   const { user } = useAuth();
+  const [authorTechnician] = useState<Employee>(initialAuthorTechnician);
+  
+  // UI state (not form data)
   const [rephraseDialogOpen, setRephraseDialogOpen] = useState(false);
-  const [currentRephraseIndex, setCurrentRephraseIndex] = useState<
-    number | null
-  >(null);
+  const [currentRephraseIndex, setCurrentRephraseIndex] = useState<number | null>(null);
   const [rephrase, setRephrase] = useState<string | null>(null);
   const [isRephrasing, setIsRephrasing] = useState<boolean>(false);
   const [isNewReport, setIsNewReport] = useState<boolean>(!serviceReport);
-  const [isWarranty, setIsWarranty] = useState<boolean>(
-    serviceReport?.warranty || false
-  );
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
   const [submittedReportId, setSubmittedReportId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isPreviewing, setIsPreviewing] = useState<boolean>(false);
-
-  const [authorTechnician] = useState<Employee>(initialAuthorTechnician);
-
-  // Filter employees to only show admins for dispatcher selection
-  const adminEmployees = employees.filter((emp) => emp.role === "admin");
-  const [assignedTechnician, setAssignedTechnician] = useState<Employee | null>(
-    null
-  );
-  const [dispatcher, setDispatcher] = useState<Employee | null>(null);
-
-  const [docId, setDocId] = useState<number | null>(serviceReport?.docId || 0);
-  // The chosen client (from ClientSelect)
-  const [client, setClient] = useState<ClientHit | null>(null);
-
-  // The chosen building (we’ll identify by serviceAddress1)
-  const [building, setBuilding] = useState<Building | null>(null);
-
-  const [materialNotes, setMaterialNotes] = useState<string>(
-    serviceReport?.materialNotes || ""
-  );
-  
-  const [emails, setEmails] = useState<string[]>([]);
-  // Add state for dialog and new building form
   const [addBuildingOpen, setAddBuildingOpen] = useState(false);
+  const [loadingPOs, setLoadingPOs] = useState(false);
+  
+  // External data state (not form data)
+  const [docId, setDocId] = useState<number | null>(serviceReport?.docId || 0);
+  const [client, setClient] = useState<ClientHit | null>(null);
+  const [building, setBuilding] = useState<Building | null>(null);
+  const [assignedTechnician, setAssignedTechnician] = useState<Employee | null>(null);
+  const [dispatcher, setDispatcher] = useState<Employee | null>(null);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [newBuilding, setNewBuilding] = useState({
     serviceAddress1: "",
     serviceAddress2: "",
@@ -144,34 +165,48 @@ export default function ServiceReportForm({
     contactPhone: "",
   });
 
-  // Controlled list of service‐note entries
-  const [serviceNotesInputs, setServiceNotesInputs] = useState<
-    ServiceNoteInput[]
-  >(
-    serviceReport?.serviceNotes.map((sn) => ({
-      date: sn.date.toDate(),
-      technicianTime: sn.technicianTime,
-      technicianOvertime: sn.technicianOvertime,
-      helperTime: sn.helperTime,
-      helperOvertime: sn.helperOvertime,
-      remoteWork: sn.remoteWork,
-      notes: sn.serviceNotes,
-    })) || [
-      {
-        date: new Date(),
-        technicianTime: "0.0",
-        technicianOvertime: "0.0",
-        helperTime: "0.0",
-        helperOvertime: "0.0",
-        remoteWork: "N",
-        notes: "",
-      },
-    ]
-  );
+  // Filter employees to only show admins for dispatcher selection
+  const adminEmployees = employees.filter((emp) => emp.role === "admin");
 
-  const [linkPurchaseOrders, setLinkPurchaseOrders] = useState(false);
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
-  const [loadingPOs, setLoadingPOs] = useState(false);
+  // Initialize form with react-hook-form
+  const form = useForm<ServiceReportFormValues>({
+    resolver: zodResolver(serviceReportFormSchema),
+    defaultValues: {
+      dispatcherId: null,
+      assignedTechnicianId: null,
+      clientId: "",
+      buildingServiceAddress1: "",
+      warranty: serviceReport?.warranty || false,
+      linkPurchaseOrders: false,
+      materialNotes: serviceReport?.materialNotes || "",
+      serviceNotes: serviceReport?.serviceNotes.map((sn) => ({
+        date: sn.date.toDate(),
+        technicianTime: sn.technicianTime,
+        technicianOvertime: sn.technicianOvertime,
+        helperTime: sn.helperTime,
+        helperOvertime: sn.helperOvertime,
+        remoteWork: sn.remoteWork as "Y" | "N",
+        notes: sn.serviceNotes,
+      })) || [
+        {
+          date: new Date(),
+          technicianTime: "0.0",
+          technicianOvertime: "0.0",
+          helperTime: "0.0",
+          helperOvertime: "0.0",
+          remoteWork: "N" as const,
+          notes: "",
+        },
+      ],
+      emails: [],
+    },
+  });
+
+  const { watch, setValue, getValues } = form;
+  const warranty = watch("warranty");
+  const linkPurchaseOrders = watch("linkPurchaseOrders");
+  const serviceNotes = watch("serviceNotes");
+  const emails = watch("emails");
 
   useEffect(() => {
     async function fetchPurchaseOrders() {
@@ -201,23 +236,19 @@ export default function ServiceReportForm({
     if (linkPurchaseOrders) fetchPurchaseOrders();
   }, [linkPurchaseOrders, docId]);
 
-  // Author technician is loaded by the page, no need to set it from firebaseUser
-
+  // Initialize form data from serviceReport
   useEffect(() => {
     async function initForm() {
       if (!serviceReport) return;
-      // Author technician is loaded by the page, so we only need to load:
-      // - assignedTechnician
-      // - dispatcher
-      // - client and building
-      // - form field values
 
       if (serviceReport.assignedTechnicianRef) {
         const empRef =
           serviceReport.assignedTechnicianRef.withConverter(employeeConverter);
         const empSnap = await getDoc(empRef);
         if (empSnap.exists()) {
-          setAssignedTechnician(empSnap.data() as Employee);
+          const emp = empSnap.data() as Employee;
+          setAssignedTechnician(emp);
+          setValue("assignedTechnicianId", emp.id);
         }
       }
 
@@ -226,12 +257,14 @@ export default function ServiceReportForm({
           serviceReport.dispatcherRef.withConverter(employeeConverter);
         const empSnap = await getDoc(empRef);
         if (empSnap.exists()) {
-          setDispatcher(empSnap.data() as Employee);
+          const emp = empSnap.data() as Employee;
+          setDispatcher(emp);
+          setValue("dispatcherId", emp.id);
         }
       }
+
       // Populate client from serviceReport.clientName if available
       if (serviceReport.clientName) {
-        // Find client by clientName in Firestore and set as ClientHit
         const q = query(
           collection(firestore, "clients"),
           where("name", "==", serviceReport.clientName)
@@ -256,46 +289,22 @@ export default function ServiceReportForm({
               : [],
           };
           setClient(clientHit);
+          setValue("clientId", clientHit.objectID);
+          
           // Set building if possible
           const foundBuilding = clientHit.buildings.find(
             (bld) => bld.serviceAddress1 === serviceReport.serviceAddress1
           );
-          setEmails(foundBuilding ? [foundBuilding.contactEmail] : []);
-          setBuilding(foundBuilding ?? null);
+          if (foundBuilding) {
+            setBuilding(foundBuilding);
+            setValue("buildingServiceAddress1", foundBuilding.serviceAddress1);
+            setValue("emails", [foundBuilding.contactEmail]);
+          }
         }
-      }
-
-      setMaterialNotes(serviceReport.materialNotes || "");
-
-      // Populate service notes
-      if (serviceReport.serviceNotes && serviceReport.serviceNotes.length > 0) {
-        setServiceNotesInputs(
-          serviceReport.serviceNotes.map((sn) => ({
-            date: sn.date.toDate(),
-            technicianTime: sn.technicianTime,
-            technicianOvertime: sn.technicianOvertime,
-            helperTime: sn.helperTime,
-            helperOvertime: sn.helperOvertime,
-            remoteWork: sn.remoteWork,
-            notes: sn.serviceNotes,
-          }))
-        );
-      } else {
-        setServiceNotesInputs([
-          {
-            date: new Date(),
-            technicianTime: "0.0",
-            technicianOvertime: "0.0",
-            helperTime: "0.0",
-            helperOvertime: "0.0",
-            remoteWork: "N",
-            notes: "",
-          },
-        ]);
       }
     }
     initForm();
-  }, [serviceReport]);
+  }, [serviceReport, setValue]);
 
   // Track original contact info for change detection
   const [originalContact, setOriginalContact] = useState({
@@ -356,14 +365,14 @@ export default function ServiceReportForm({
   };
 
   const handleWarrantyChange = (checked: boolean) => {
-    setIsWarranty(checked);
+    setValue("warranty", checked);
     if (checked) {
       // remove building contact info when warranty is checked
-      setEmails([]);
+      setValue("emails", []);
     } else {
       // restore building contact info when warranty is unchecked
       if (building) {
-        setEmails([building.contactEmail]);
+        setValue("emails", [building.contactEmail]);
       }
     }
   };
@@ -378,19 +387,18 @@ export default function ServiceReportForm({
       return;
     }
 
-    setIsSubmitting(true);
     setIsRephrasing(true);
     try {
       setCurrentRephraseIndex(index);
       setRephraseDialogOpen(true);
-      const noteToRephrase = serviceNotesInputs[index].notes;
+      const currentNotes = getValues("serviceNotes");
+      const noteToRephrase = currentNotes[index]?.notes;
       if (!noteToRephrase) {
         toast.error(
           <span className="text-lg md:text-sm">
             No service note text to rephrase.
           </span>
         );
-        setIsSubmitting(false);
         return;
       }
       const response = await openAIClient.responses.create({
@@ -409,18 +417,17 @@ export default function ServiceReportForm({
         </span>
       );
     } finally {
-      setIsSubmitting(false);
       setIsRephrasing(false);
     }
   };
 
   const handleRephraseConfirm = (index: number) => {
-    if (rephrase) {
-      setServiceNotesInputs((prev) =>
-        prev.map((note, i) =>
-          i === index ? { ...note, notes: rephrase } : note
-        )
+    if (rephrase && currentRephraseIndex !== null) {
+      const currentNotes = getValues("serviceNotes");
+      const updatedNotes = currentNotes.map((note, i) =>
+        i === index ? { ...note, notes: rephrase } : note
       );
+      setValue("serviceNotes", updatedNotes);
       setRephrase(null);
       toast.success(
         <span className="text-lg md:text-sm">
@@ -442,6 +449,8 @@ export default function ServiceReportForm({
       return;
     }
 
+    const formData = getValues();
+    
     if (!client) {
       toast.error(
         <span className="text-lg md:text-sm">
@@ -462,7 +471,7 @@ export default function ServiceReportForm({
       return;
     }
 
-    if (serviceNotesInputs.length === 0) {
+    if (formData.serviceNotes.length === 0) {
       toast.error(
         <span className="text-lg md:text-sm">
           Please add at least one service note before saving the draft.
@@ -476,11 +485,11 @@ export default function ServiceReportForm({
       // Create a new service report object
       if (isNewReport) {
         // get new id
-        const docId = await reserveDocid();
+        const newDocId = await reserveDocid();
         // create new document reference
         const newServiceReport: ServiceReport = {
           id: crypto.randomUUID(),
-          docId: docId,
+          docId: newDocId,
           authorTechnicianRef: doc(
             firestore,
             "employees",
@@ -499,11 +508,9 @@ export default function ServiceReportForm({
           contactName: building.contactName,
           contactEmail: building.contactEmail,
           contactPhone: building.contactPhone,
-          materialNotes,
-          serviceNotes: serviceNotesInputs.map((note) => ({
-            date: note.date
-              ? Timestamp.fromDate(new Date(note.date))
-              : Timestamp.now(),
+          materialNotes: formData.materialNotes,
+          serviceNotes: formData.serviceNotes.map((note) => ({
+            date: Timestamp.fromDate(note.date),
             technicianTime: note.technicianTime,
             technicianOvertime: note.technicianOvertime,
             helperTime: note.helperTime,
@@ -515,7 +522,7 @@ export default function ServiceReportForm({
           dateSigned: null,
           draft: true,
           printedName: "",
-          warranty: isWarranty,
+          warranty: formData.warranty,
         };
 
         // create new document reference
@@ -525,7 +532,7 @@ export default function ServiceReportForm({
           ),
           newServiceReport
         );
-        setDocId(docId);
+        setDocId(newDocId);
 
         window.location.href = `/dashboard/service-reports/${docRef.id}/edit`;
       } else {
@@ -557,11 +564,9 @@ export default function ServiceReportForm({
           contactName: building.contactName,
           contactEmail: building.contactEmail,
           contactPhone: building.contactPhone,
-          materialNotes,
-          serviceNotes: serviceNotesInputs.map((note) => ({
-            date: note.date
-              ? Timestamp.fromDate(new Date(note.date))
-              : Timestamp.now(),
+          materialNotes: formData.materialNotes,
+          serviceNotes: formData.serviceNotes.map((note) => ({
+            date: Timestamp.fromDate(note.date),
             technicianTime: note.technicianTime,
             technicianOvertime: note.technicianOvertime,
             helperTime: note.helperTime,
@@ -569,7 +574,7 @@ export default function ServiceReportForm({
             remoteWork: note.remoteWork,
             serviceNotes: note.notes,
           })),
-          warranty: isWarranty,
+          warranty: formData.warranty,
         };
 
         await setDoc(serviceReportRef, serviceReportData);
@@ -604,56 +609,29 @@ export default function ServiceReportForm({
   };
 
   const handleAddServiceNote = () => {
-    setServiceNotesInputs((prev) => [
-      ...prev,
+    const currentNotes = getValues("serviceNotes");
+    setValue("serviceNotes", [
+      ...currentNotes,
       {
         date: new Date(),
         technicianTime: "0.0",
         technicianOvertime: "0.0",
         helperTime: "0.0",
         helperOvertime: "0.0",
-        remoteWork: "N",
+        remoteWork: "N" as const,
         notes: "",
       },
     ]);
   };
 
   const handleRemoveServiceNote = (index: number) => {
-    setServiceNotesInputs((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleServiceNoteChange = (
-    index: number,
-    field: keyof ServiceNoteInput,
-    value: string
-  ) => {
-    setServiceNotesInputs((prev) =>
-      prev.map((note, i) =>
-        i === index
-          ? {
-              ...note,
-              [field]: value,
-            }
-          : note
-      )
-    );
-  };
-
-  const handleServiceNoteDateChange = (
-    index: number,
-    date: Date | undefined
-  ) => {
-    if (date) {
-      setServiceNotesInputs((prev) =>
-        prev.map((note, i) =>
-          i === index ? { ...note, date: new Date(date) } : note
-        )
-      );
-    }
+    const currentNotes = getValues("serviceNotes");
+    setValue("serviceNotes", currentNotes.filter((_, i) => i !== index));
   };
 
   // Helper to combine additional materials with PO materials for preview/submit
   function getCombinedMaterials() {
+    const materialNotes = getValues("materialNotes");
     let combined = materialNotes?.trim() || "";
     if (linkPurchaseOrders && purchaseOrders.length > 0) {
       const poMaterials = purchaseOrders
@@ -683,13 +661,13 @@ export default function ServiceReportForm({
   // Helper to get all unique emails (technician emails + manual emails)
   function getAllUniqueEmails(): string[] {
     const technicianEmails = getTechnicianEmails();
-    const allEmails = [...technicianEmails, ...emails];
+    const formEmails = getValues("emails");
+    const allEmails = [...technicianEmails, ...formEmails];
     // Remove duplicates and empty strings
     return [...new Set(allEmails.filter(email => email && email.trim() !== ""))];
   }
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (data: ServiceReportFormValues) => {
     setIsSubmitting(true);
 
     if (contactChanged) {
@@ -712,7 +690,6 @@ export default function ServiceReportForm({
       return;
     }
 
-
     if (!client || !building) {
       toast.error(
         <span className="text-lg md:text-sm">
@@ -727,31 +704,6 @@ export default function ServiceReportForm({
       toast.error(
         <span className="text-lg md:text-sm">
           Please select a dispatcher before submitting.
-        </span>
-      );
-      setIsSubmitting(false);
-      return;
-    }
-
-    // Validate service notes - each note must have at least technician time
-    const invalidNotes: number[] = [];
-    serviceNotesInputs.forEach((note, index) => {
-      const techTime = parseFloat(note.technicianTime) || 0;
-      const helperTime = parseFloat(note.helperTime) || 0;
-      
-      // At least technician time must be greater than 0
-      if (techTime <= 0 && helperTime <= 0) {
-        invalidNotes.push(index + 1); // Entry numbers are 1-based for display
-      }
-    });
-
-    if (invalidNotes.length > 0) {
-      const entryText = invalidNotes.length === 1 
-        ? `Entry #${invalidNotes[0]}` 
-        : `Entries #${invalidNotes.join(", #")}`;
-      toast.error(
-        <span className="text-lg md:text-sm">
-          Missing time information: {entryText} {invalidNotes.length === 1 ? "is" : "are"} missing technician time. All service notes must have at least technician time.
         </span>
       );
       setIsSubmitting(false);
@@ -782,9 +734,9 @@ export default function ServiceReportForm({
         contactName: building.contactName,
         contactEmail: building.contactEmail,
         contactPhone: building.contactPhone,
-        materialNotes,
-        serviceNotes: serviceNotesInputs.map((n) => ({
-          date: Timestamp.fromDate(n.date as Date),
+        materialNotes: data.materialNotes,
+        serviceNotes: data.serviceNotes.map((n) => ({
+          date: Timestamp.fromDate(n.date),
           technicianTime: n.technicianTime,
           technicianOvertime: n.technicianOvertime,
           helperTime: n.helperTime,
@@ -796,7 +748,7 @@ export default function ServiceReportForm({
         dateSigned: null,
         draft: false,
         printedName: "",
-        warranty: isWarranty,
+        warranty: data.warranty,
       };
       const ref = await addDoc(
         collection(firestore, "reports").withConverter(serviceReportConverter),
@@ -817,8 +769,8 @@ export default function ServiceReportForm({
         dispatcherRef: dispatcher
           ? doc(firestore, "employees", dispatcher.id)
           : null,
-        serviceNotes: serviceNotesInputs.map((n) => ({
-          date: Timestamp.fromDate(n.date as Date),
+        serviceNotes: data.serviceNotes.map((n) => ({
+          date: Timestamp.fromDate(n.date),
           technicianTime: n.technicianTime,
           technicianOvertime: n.technicianOvertime,
           helperTime: n.helperTime,
@@ -827,7 +779,7 @@ export default function ServiceReportForm({
           serviceNotes: n.notes,
         })),
         draft: false,
-        warranty: isWarranty,
+        warranty: data.warranty,
       });
     }
 
@@ -849,9 +801,8 @@ export default function ServiceReportForm({
     const authorizationHeader = `Bearer ${token}`;
     // Now build and send email via API
     const formatDate = (d: Date) => d.toLocaleDateString("en-US");
-    const firstDate = serviceNotesInputs[0].date as Date;
-    const lastDate = serviceNotesInputs[serviceNotesInputs.length - 1]
-      .date as Date;
+    const firstDate = data.serviceNotes[0].date;
+    const lastDate = data.serviceNotes[data.serviceNotes.length - 1].date;
     
     // Determine which technician to use: assigned technician > dispatcher > author technician
     const technicianForReport = assignedTechnician || dispatcher || authorTechnician;
@@ -864,31 +815,31 @@ export default function ServiceReportForm({
         building.serviceAddress1 +
         (building.serviceAddress2 ? ` ${building.serviceAddress2}` : ""),
       city_state_zip: building.cityStateZip,
-      contact_name: isWarranty
+      contact_name: data.warranty
         ? `Warranty for ${building.contactName}`
         : building.contactName,
       contact_phone: building.contactPhone,
       contact_email: building.contactEmail,
       signature: null,
-      t_time: serviceNotesInputs.reduce(
+      t_time: data.serviceNotes.reduce(
         (sum, n) => sum + parseFloat(n.technicianTime),
         0
       ),
-      t_ot: serviceNotesInputs.reduce(
+      t_ot: data.serviceNotes.reduce(
         (sum, n) => sum + parseFloat(n.technicianOvertime),
         0
       ),
-      h_time: serviceNotesInputs.reduce(
+      h_time: data.serviceNotes.reduce(
         (sum, n) => sum + parseFloat(n.helperTime),
         0
       ),
-      h_ot: serviceNotesInputs.reduce(
+      h_ot: data.serviceNotes.reduce(
         (sum, n) => sum + parseFloat(n.helperOvertime),
         0
       ),
       materials: getCombinedMaterials(),
-      notes: serviceNotesInputs.map((n) => ({
-        date: formatDate(n.date as Date),
+      notes: data.serviceNotes.map((n) => ({
+        date: formatDate(n.date),
         t_time: parseFloat(n.technicianTime),
         t_ot: parseFloat(n.technicianOvertime),
         h_time: parseFloat(n.helperTime),
@@ -914,9 +865,9 @@ export default function ServiceReportForm({
         },
         body: JSON.stringify(message),
       });
-      const data = await res.json();
+      const responseData = await res.json();
       if (res.status < 200 || res.status >= 300) {
-        throw new Error(`Mail API returned status ${res.status} instead of expected 2xx range. ${data.message ? `Response: ${data.message}` : ''}`);
+        throw new Error(`Mail API returned status ${res.status} instead of expected 2xx range. ${responseData.message ? `Response: ${responseData.message}` : ''}`);
       }
       toast.success(
         <span className="text-lg md:text-sm">
@@ -951,7 +902,7 @@ export default function ServiceReportForm({
     return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
   };
 
-  const handleAddBuilding = async (e: FormEvent) => {
+  const handleAddBuilding = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Handle adding the new building
@@ -1049,6 +1000,7 @@ export default function ServiceReportForm({
       const authorizationHeader = `Bearer ${token}`;
 
       const formatDate = (d: Date) => d.toLocaleDateString("en-US");
+      const formData = getValues();
       
       // Determine which technician to use: assigned technician > dispatcher > author technician
       const technicianForReport = assignedTechnician || dispatcher || authorTechnician;
@@ -1065,25 +1017,25 @@ export default function ServiceReportForm({
         contact_phone: building.contactPhone,
         contact_email: building.contactEmail,
         signature: null,
-        t_time: serviceNotesInputs.reduce(
+        t_time: formData.serviceNotes.reduce(
           (sum, n) => sum + parseFloat(n.technicianTime),
           0
         ),
-        t_ot: serviceNotesInputs.reduce(
+        t_ot: formData.serviceNotes.reduce(
           (sum, n) => sum + parseFloat(n.technicianOvertime),
           0
         ),
-        h_time: serviceNotesInputs.reduce(
+        h_time: formData.serviceNotes.reduce(
           (sum, n) => sum + parseFloat(n.helperTime),
           0
         ),
-        h_ot: serviceNotesInputs.reduce(
+        h_ot: formData.serviceNotes.reduce(
           (sum, n) => sum + parseFloat(n.helperOvertime),
           0
         ),
         materials: getCombinedMaterials(),
-        notes: serviceNotesInputs.map((n) => ({
-          date: formatDate(n.date as Date),
+        notes: formData.serviceNotes.map((n) => ({
+          date: formatDate(n.date),
           t_time: parseFloat(n.technicianTime),
           t_ot: parseFloat(n.technicianOvertime),
           h_time: parseFloat(n.helperTime),
@@ -1106,12 +1058,12 @@ export default function ServiceReportForm({
         body: JSON.stringify(message),
       });
 
-      const data: { message: string; url: string; code: number } =
+      const responseData: { message: string; url: string; code: number } =
         await res.json();
       if (!res.ok) {
-        throw new Error(data.message || "Error generating PDF");
+        throw new Error(responseData.message || "Error generating PDF");
       }
-      window.open(data.url, "_blank");
+      window.open(responseData.url, "_blank");
 
       toast.success(
         <span className="text-lg md:text-sm">PDF generated and downloaded</span>
@@ -1129,14 +1081,16 @@ export default function ServiceReportForm({
   };
 
   function handleRemoveEmail(idx: number): void {
-    setEmails((prevEmails) => prevEmails.filter((_, index) => index !== idx));
+    const currentEmails = getValues("emails");
+    setValue("emails", currentEmails.filter((_, index) => index !== idx));
   }
 
   function handleAddEmail(
     event: React.MouseEvent<HTMLButtonElement, MouseEvent>
   ): void {
     event.preventDefault();
-    setEmails((prevEmails) => [...prevEmails, ""]);
+    const currentEmails = getValues("emails");
+    setValue("emails", [...currentEmails, ""]);
   }
 
   // Form is always ready - page handles loading state and ensures all data is available
@@ -1196,7 +1150,8 @@ export default function ServiceReportForm({
         </DialogContent>
       </Dialog>
 
-      <form onSubmit={handleSubmit}>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(handleSubmit)}>
         <div className="mt-4 flex flex-col gap-6">
           {/* === DocId === */}
           {docId !== null && docId != 0 && (
@@ -1214,7 +1169,10 @@ export default function ServiceReportForm({
               error={employeesError}
               refetch={refetchEmployees}
               selectedEmployee={dispatcher}
-              setSelectedEmployee={setDispatcher}
+              setSelectedEmployee={(emp) => {
+                setDispatcher(emp);
+                setValue("dispatcherId", emp?.id || null);
+              }}
               placeholder="Select Dispatcher..."
             />
             <p className="text-sm text-muted-foreground mt-2">
@@ -1231,7 +1189,10 @@ export default function ServiceReportForm({
               error={employeesError}
               refetch={refetchEmployees}
               selectedEmployee={assignedTechnician}
-              setSelectedEmployee={setAssignedTechnician}
+              setSelectedEmployee={(emp) => {
+                setAssignedTechnician(emp);
+                setValue("assignedTechnicianId", emp?.id || null);
+              }}
               placeholder="Select Technician..."
             />
             <p className="text-sm text-muted-foreground mt-2">
@@ -1246,9 +1207,14 @@ export default function ServiceReportForm({
               selectedClient={client}
               setSelectedClient={(selected) => {
                 setClient(selected || null);
-
+                if (selected) {
+                  setValue("clientId", selected.objectID);
+                } else {
+                  setValue("clientId", "");
+                }
                 // Clear any previously selected building and all its dependent fields:
                 setBuilding(null);
+                setValue("buildingServiceAddress1", "");
               }}
             />
           </div>
@@ -1273,8 +1239,9 @@ export default function ServiceReportForm({
 
                       if (found) {
                         setBuilding(found);
-                        if (!isWarranty) {
-                          setEmails([found.contactEmail]);
+                        setValue("buildingServiceAddress1", found.serviceAddress1);
+                        if (!warranty) {
+                          setValue("emails", [found.contactEmail]);
                         }
                         // Set as original contact
                         setOriginalContact({
@@ -1468,11 +1435,10 @@ export default function ServiceReportForm({
                           }
                         : null
                     );
-                    setEmails((prev) => {
-                      const newEmails = [...prev];
-                      newEmails[0] = e.target.value; // Always update the first email
-                      return newEmails;
-                    });
+                    const currentEmails = getValues("emails");
+                    const newEmails = [...currentEmails];
+                    newEmails[0] = e.target.value; // Always update the first email
+                    setValue("emails", newEmails);
                   }}
                   placeholder="Contact Email"
                   type="email"
@@ -1517,30 +1483,46 @@ export default function ServiceReportForm({
             </div>
           )}
           {/* === Warranty Checkbox === */}
-          <div className="flex items-center space-x-2">
-            <Label htmlFor="warrantySwitch">Warranty Service</Label>
-            <Switch
-              id="warrantySwitch"
-              checked={isWarranty}
-              onCheckedChange={handleWarrantyChange}
-            />
-            <p className="text-sm">{isWarranty ? "Yes" : "No"}</p>
-          </div>
+          <FormField
+            control={form.control}
+            name="warranty"
+            render={({ field }) => (
+              <FormItem className="flex items-center space-x-2">
+                <FormLabel htmlFor="warrantySwitch">Warranty Service</FormLabel>
+                <FormControl>
+                  <Switch
+                    id="warrantySwitch"
+                    checked={field.value}
+                    onCheckedChange={handleWarrantyChange}
+                  />
+                </FormControl>
+                <p className="text-sm">{field.value ? "Yes" : "No"}</p>
+              </FormItem>
+            )}
+          />
           <p className="text-sm text-muted-foreground">
             If enabled, this will send the email to our system internally.
           </p>
 
           {/* === Purchase Orders Switch === */}
-          <div className="flex items-center space-x-2 mt-2">
-            <Label htmlFor="linkPurchaseOrdersSwitch">Link Purchase Orders</Label>
-            <Switch
-              id="linkPurchaseOrdersSwitch"
-              checked={linkPurchaseOrders}
-              onCheckedChange={setLinkPurchaseOrders}
-            />
-            <p className="text-sm">{linkPurchaseOrders ? "On" : "Off"}</p>
-            {loadingPOs && <Loader2 className="animate-spin h-4 w-4 ml-2 text-muted-foreground" />}
-          </div>
+          <FormField
+            control={form.control}
+            name="linkPurchaseOrders"
+            render={({ field }) => (
+              <FormItem className="flex items-center space-x-2 mt-2">
+                <FormLabel htmlFor="linkPurchaseOrdersSwitch">Link Purchase Orders</FormLabel>
+                <FormControl>
+                  <Switch
+                    id="linkPurchaseOrdersSwitch"
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+                <p className="text-sm">{field.value ? "On" : "Off"}</p>
+                {loadingPOs && <Loader2 className="animate-spin h-4 w-4 ml-2 text-muted-foreground" />}
+              </FormItem>
+            )}
+          />
           {linkPurchaseOrders && !loadingPOs && (
             <div className="mt-2 border rounded-lg p-4 bg-muted/30">
               { purchaseOrders.length === 0 ? (
@@ -1559,217 +1541,261 @@ export default function ServiceReportForm({
           )}
 
           {/* === Material Notes === */}
-          <div className="flex flex-col space-y-2">
-            <Label htmlFor="materialNotes">Additional Materials</Label>
-            <Textarea
-              id="materialNotes"
-              value={materialNotes}
-              onChange={(e) => setMaterialNotes(e.target.value)}
-              placeholder="Optional materials used not already in POs"
-              rows={3}
-              className="text-sm"
-            />
-          </div>
-
-          {/* === Service Notes === */}
-          <div className="mt-6">
-            <Label>Service Notes</Label>
-            {serviceNotesInputs.map((note, idx) => (
-              <div key={idx} className="mt-4 border rounded-lg p-4 space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">
-                    Entry #{idx + 1}
-                  </span>
-                  {serviceNotesInputs.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleRemoveServiceNote(idx)}
-                    >
-                      Remove
-                    </Button>
-                  )}
-                </div>
-
-                <div className="md:max-w-96">
-                  <Label htmlFor={`noteDate_${idx}`} className="mb-2 block">
-                    Date
-                  </Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={note.date ? "outline" : "secondary"}
-                        className={
-                          "w-full justify-start text-left font-normal flex items-center " +
-                          (!note.date ? "text-muted-foreground" : "")
-                        }
-                      >
-                        <span className="flex-1 text-left">
-                          {note.date.toDateString()}
-                        </span>
-                        <CalendarIcon className="ml-2 w-4 h-4 text-muted-foreground" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={note.date}
-                        onSelect={(date) => {
-                          handleServiceNoteDateChange(idx, date);
-                        }}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                {/* Time fields: Technician and Helper on separate rows */}
-                <div className="flex flex-col gap-2 md:gap-4">
-                  {/* Technician Time */}
-                  <div className="flex flex-col md:flex-row md:gap-4 space-y-4">
-                    <div className="flex flex-col">
-                      <Label
-                        htmlFor={`technicianTime_${idx}`}
-                        className="mb-2 block"
-                      >
-                        Technician Time
-                      </Label>
-                      <TimeSelect
-                        selectedTime={note.technicianTime}
-                        setSelectedTime={(val: string) =>
-                          handleServiceNoteChange(idx, "technicianTime", val)
-                        }
-                      />
-                    </div>
-                    <div className="flex flex-col">
-                      <Label
-                        htmlFor={`technicianOvertime_${idx}`}
-                        className="mb-2 block"
-                      >
-                        Technician Overtime
-                      </Label>
-                      <TimeSelect
-                        selectedTime={note.technicianOvertime}
-                        setSelectedTime={(val: string) =>
-                          handleServiceNoteChange(
-                            idx,
-                            "technicianOvertime",
-                            val
-                          )
-                        }
-                      />
-                    </div>
-                  </div>
-                  {/* Helper Time */}
-                  <div className="flex flex-col md:flex-row md:gap-4 space-y-4">
-                    <div className="flex flex-col">
-                      <Label
-                        htmlFor={`helperTime_${idx}`}
-                        className="mb-2 block"
-                      >
-                        Helper Time
-                      </Label>
-                      <TimeSelect
-                        selectedTime={note.helperTime}
-                        setSelectedTime={(val: string) =>
-                          handleServiceNoteChange(idx, "helperTime", val)
-                        }
-                      />
-                    </div>
-                    <div className="flex flex-col">
-                      <Label
-                        htmlFor={`helperOvertime_${idx}`}
-                        className="mb-2 block"
-                      >
-                        Helper Overtime
-                      </Label>
-                      <TimeSelect
-                        selectedTime={note.helperOvertime}
-                        setSelectedTime={(val: string) =>
-                          handleServiceNoteChange(idx, "helperOvertime", val)
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Remove the old Remote Work input and add a Switch */}
-                <div className="flex items-center gap-2">
-                  <Label htmlFor={`remoteWork_${idx}`} className="mb-1">
-                    Remote Work
-                  </Label>
-                  <Switch
-                    id={`remoteWork_${idx}`}
-                    className="cursor-pointer"
-                    checked={note.remoteWork === "Y"}
-                    onCheckedChange={(checked: boolean) =>
-                      handleServiceNoteChange(
-                        idx,
-                        "remoteWork",
-                        checked ? "Y" : "N"
-                      )
-                    }
-                  />
-                  <span className="ml-2 text-sm">
-                    {note.remoteWork === "Y" ? "Yes" : "No"}
-                  </span>
-                </div>
-
-                <div>
-                  <Label htmlFor={`notes_${idx}`} className="mb-2 block">
-                    Service Notes
-                  </Label>
+          <FormField
+            control={form.control}
+            name="materialNotes"
+            render={({ field }) => (
+              <FormItem className="flex flex-col space-y-2">
+                <FormLabel htmlFor="materialNotes">Additional Materials</FormLabel>
+                <FormControl>
                   <Textarea
-                    id={`notes_${idx}`}
-                    value={note.notes}
-                    onChange={(e) =>
-                      handleServiceNoteChange(idx, "notes", e.target.value)
-                    }
+                    id="materialNotes"
+                    {...field}
+                    placeholder="Optional materials used not already in POs"
                     rows={3}
-                    placeholder="Describe work performed"
-                    required
                     className="text-sm"
                   />
-                  <div className="flex justify-end mt-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        const wordCount = note.notes
-                          .trim()
-                          .split(/\s+/)
-                          .filter((w) => w).length;
-                        if (wordCount < 6) {
-                          toast.error(
-                            <span className="text-lg md:text-sm">
-                              Please enter at least 6 words before rephrasing.
-                            </span>
-                          );
-                          return;
-                        }
-                        setCurrentRephraseIndex(idx);
-                        setRephrase(null);
-                        setRephraseDialogOpen(true);
-                        handleRephrase(idx);
-                      }}
-                    >
-                      AI Rephrase
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ))}
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-            <Button
-              type="button"
-              variant="secondary"
-              className="mt-4"
-              onClick={handleAddServiceNote}
-            >
-              Add a Service Note
-            </Button>
-          </div>
+          {/* === Service Notes === */}
+          <FormField
+            control={form.control}
+            name="serviceNotes"
+            render={() => (
+              <FormItem className="mt-6">
+                <FormLabel>Service Notes</FormLabel>
+                {serviceNotes.map((note, idx) => (
+                  <div key={idx} className="mt-4 border rounded-lg p-4 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">
+                        Entry #{idx + 1}
+                      </span>
+                      {serviceNotes.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleRemoveServiceNote(idx)}
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name={`serviceNotes.${idx}.date`}
+                      render={({ field }) => (
+                        <FormItem className="md:max-w-96">
+                          <FormLabel htmlFor={`noteDate_${idx}`} className="mb-2 block">
+                            Date
+                          </FormLabel>
+                          <FormControl>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant={field.value ? "outline" : "secondary"}
+                                  className={
+                                    "w-full justify-start text-left font-normal flex items-center " +
+                                    (!field.value ? "text-muted-foreground" : "")
+                                  }
+                                >
+                                  <span className="flex-1 text-left">
+                                    {field.value?.toDateString() || "Select date"}
+                                  </span>
+                                  <CalendarIcon className="ml-2 w-4 h-4 text-muted-foreground" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                  mode="single"
+                                  selected={field.value}
+                                  onSelect={field.onChange}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Time fields: Technician and Helper on separate rows */}
+                    <div className="flex flex-col gap-2 md:gap-4">
+                      {/* Technician Time */}
+                      <div className="flex flex-col md:flex-row md:gap-4 space-y-4">
+                        <FormField
+                          control={form.control}
+                          name={`serviceNotes.${idx}.technicianTime`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-col">
+                              <FormLabel htmlFor={`technicianTime_${idx}`} className="mb-2 block">
+                                Technician Time
+                              </FormLabel>
+                              <FormControl>
+                                <TimeSelect
+                                  selectedTime={field.value}
+                                  setSelectedTime={field.onChange}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`serviceNotes.${idx}.technicianOvertime`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-col">
+                              <FormLabel htmlFor={`technicianOvertime_${idx}`} className="mb-2 block">
+                                Technician Overtime
+                              </FormLabel>
+                              <FormControl>
+                                <TimeSelect
+                                  selectedTime={field.value}
+                                  setSelectedTime={field.onChange}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      {/* Helper Time */}
+                      <div className="flex flex-col md:flex-row md:gap-4 space-y-4">
+                        <FormField
+                          control={form.control}
+                          name={`serviceNotes.${idx}.helperTime`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-col">
+                              <FormLabel htmlFor={`helperTime_${idx}`} className="mb-2 block">
+                                Helper Time
+                              </FormLabel>
+                              <FormControl>
+                                <TimeSelect
+                                  selectedTime={field.value}
+                                  setSelectedTime={field.onChange}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`serviceNotes.${idx}.helperOvertime`}
+                          render={({ field }) => (
+                            <FormItem className="flex flex-col">
+                              <FormLabel htmlFor={`helperOvertime_${idx}`} className="mb-2 block">
+                                Helper Overtime
+                              </FormLabel>
+                              <FormControl>
+                                <TimeSelect
+                                  selectedTime={field.value}
+                                  setSelectedTime={field.onChange}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Remote Work Switch */}
+                    <FormField
+                      control={form.control}
+                      name={`serviceNotes.${idx}.remoteWork`}
+                      render={({ field }) => (
+                        <FormItem className="flex items-center gap-2">
+                          <FormLabel htmlFor={`remoteWork_${idx}`} className="mb-1">
+                            Remote Work
+                          </FormLabel>
+                          <FormControl>
+                            <Switch
+                              id={`remoteWork_${idx}`}
+                              className="cursor-pointer"
+                              checked={field.value === "Y"}
+                              onCheckedChange={(checked: boolean) =>
+                                field.onChange(checked ? "Y" : "N")
+                              }
+                            />
+                          </FormControl>
+                          <span className="ml-2 text-sm">
+                            {field.value === "Y" ? "Yes" : "No"}
+                          </span>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name={`serviceNotes.${idx}.notes`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel htmlFor={`notes_${idx}`} className="mb-2 block">
+                            Service Notes
+                          </FormLabel>
+                          <FormControl>
+                            <Textarea
+                              id={`notes_${idx}`}
+                              {...field}
+                              rows={3}
+                              placeholder="Describe work performed"
+                              className="text-sm"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                          <div className="flex justify-end mt-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const wordCount = field.value
+                                  .trim()
+                                  .split(/\s+/)
+                                  .filter((w) => w).length;
+                                if (wordCount < 6) {
+                                  toast.error(
+                                    <span className="text-lg md:text-sm">
+                                      Please enter at least 6 words before rephrasing.
+                                    </span>
+                                  );
+                                  return;
+                                }
+                                setCurrentRephraseIndex(idx);
+                                setRephrase(null);
+                                setRephraseDialogOpen(true);
+                                handleRephrase(idx);
+                              }}
+                            >
+                              AI Rephrase
+                            </Button>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                ))}
+
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="mt-4"
+                  onClick={handleAddServiceNote}
+                >
+                  Add a Service Note
+                </Button>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           {/* Add List of Contact to Send Email To */}
           {/* Create list of inputs per contact email, buttons to remove and add contact emails */}
@@ -1801,42 +1827,55 @@ export default function ServiceReportForm({
             )}
 
             {/* Display manual emails (editable) */}
-            <div>
-              <Label className="text-sm font-medium mb-2 block">
-                Additional Email Contacts:
-              </Label>
-              {emails.map((email, idx) => (
-                <div key={idx} className="flex items-center gap-4 mt-2 md:max-w-96">
-                  <Input
-                    type="email"
-                    value={email}
-                    onChange={(e) => {
-                      const newEmails = [...emails];
-                      newEmails[idx] = e.target.value;
-                      setEmails(newEmails);
-                    }}
-                    placeholder="Contact Email"
-                    className="flex-1 text-sm"
-                  />
+            <FormField
+              control={form.control}
+              name="emails"
+              render={() => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium mb-2 block">
+                    Additional Email Contacts:
+                  </FormLabel>
+                  {emails.map((email, idx) => (
+                    <FormField
+                      key={idx}
+                      control={form.control}
+                      name={`emails.${idx}`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="flex items-center gap-4 mt-2 md:max-w-96">
+                            <FormControl>
+                              <Input
+                                type="email"
+                                {...field}
+                                placeholder="Contact Email"
+                                className="flex-1 text-sm"
+                              />
+                            </FormControl>
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleRemoveEmail(idx)}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ))}
                   <Button
                     type="button"
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleRemoveEmail(idx)}
+                    variant="secondary"
+                    className="mt-4"
+                    onClick={handleAddEmail}
                   >
-                    Remove
+                    Add Email Contact
                   </Button>
-                </div>
-              ))}
-              <Button
-                type="button"
-                variant="secondary"
-                className="mt-4"
-                onClick={handleAddEmail}
-              >
-                Add Email Contact
-              </Button>
-            </div>
+                </FormItem>
+              )}
+            />
 
             {/* === Preview/Save/Submit Buttons === */}
             <div className="mt-8 mb-8">
@@ -1873,6 +1912,7 @@ export default function ServiceReportForm({
           </div>
         </div>
       </form>
+      </Form>
     </>
   );
 }

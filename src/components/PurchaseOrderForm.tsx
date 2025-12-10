@@ -43,26 +43,113 @@ import { Textarea } from "./ui/textarea";
 import ServiceReportSelect from "./ServiceReportSelect";
 import { FileSelectButton } from "./FileselectButton";
 import ProjectSelect from "./ProjectSelect";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 
 interface PurchaseOrderFormProps {
   purchaseOrder: PurchaseOrder;
 }
 
+// Zod schema for purchase order form validation
+const purchaseOrderFormSchema = z
+  .object({
+    vendor: z.string().min(1, "Vendor is required"),
+    categoryType: z.enum(["other", "project", "service"]).nullable(),
+    otherCategory: z.string().optional(),
+    projectDocId: z.number().optional().nullable(),
+    serviceReportDocId: z.number().optional().nullable(),
+    amount: z.string().refine(
+      (val) => {
+        const parsed = parseFloat(val);
+        return !isNaN(parsed) && parsed > 0;
+      },
+      { message: "Amount must be greater than 0" }
+    ),
+    description: z.string().min(1, "Description is required"),
+  })
+  .refine(
+    (data) => {
+      if (data.categoryType === "other") {
+        return !!data.otherCategory && data.otherCategory.trim().length > 0;
+      }
+      return true;
+    },
+    {
+      message: "Other category is required",
+      path: ["otherCategory"],
+    }
+  )
+  .refine(
+    (data) => {
+      if (data.categoryType === "project") {
+        return !!data.projectDocId;
+      }
+      return true;
+    },
+    {
+      message: "Project is required",
+      path: ["projectDocId"],
+    }
+  )
+  .refine(
+    (data) => {
+      if (data.categoryType === "service") {
+        return !!data.serviceReportDocId;
+      }
+      return true;
+    },
+    {
+      message: "Service report is required",
+      path: ["serviceReportDocId"],
+    }
+  )
+  .refine(
+    (data) => {
+      return !!data.categoryType;
+    },
+    {
+      message: "Please select a category type",
+      path: ["categoryType"],
+    }
+  );
+
+type PurchaseOrderFormValues = z.infer<typeof purchaseOrderFormSchema>;
+
 export default function PurchaseOrderForm({
   purchaseOrder,
 }: PurchaseOrderFormProps) {
   const { user } = useAuth();
+  
+  // Form state
+  const form = useForm<PurchaseOrderFormValues>({
+    resolver: zodResolver(purchaseOrderFormSchema),
+    defaultValues: {
+      vendor: purchaseOrder.vendor || "",
+      categoryType: null,
+      otherCategory: purchaseOrder.otherCategory || "",
+      projectDocId: purchaseOrder.projectDocId || null,
+      serviceReportDocId: purchaseOrder.serviceReportDocId || null,
+      amount: purchaseOrder.amount?.toString() || "",
+      description: purchaseOrder.description || "",
+    },
+  });
+
+  const { watch, setValue, getValues, formState } = form;
+  const categoryType = watch("categoryType");
+  const amount = watch("amount");
+
+  // UI state (not form data)
   const [technician, setTechnician] = useState<Employee | null>(null);
-  const [description, setDescription] = useState(
-    purchaseOrder.description || ""
-  );
-  const [amount, setAmount] = useState<string>(
-    purchaseOrder.amount?.toString() || ""
-  );
   const [vendor, setVendor] = useState<VendorHit | null>(null);
-  const [otherCategory, setOtherCategory] = useState(
-    purchaseOrder.otherCategory || ""
-  );
   const [serviceReports, setServiceReports] = useState<ServiceReport[]>([]);
   const [selectedProject, setSelectedProject] = useState<ProjectHit | null>(
     null
@@ -75,26 +162,18 @@ export default function PurchaseOrderForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>("");
-  const [categoryType, setCategoryType] = useState<
-    "other" | "project" | "service" | null
-  >(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadErrors, setUploadErrors] = useState<string[]>([]);
 
   const getAmountAsNumber = (): number => {
-    const parsed = parseFloat(amount);
+    const parsed = parseFloat(amount || "0");
     return isNaN(parsed) ? 0 : parsed;
   };
 
   const canSubmit: boolean =
-    !!description &&
-    !!amount &&
-    !isNaN(parseFloat(amount)) &&
-    parseFloat(amount) > 0 &&
+    formState.isValid &&
     !!vendor &&
-    ((categoryType === "project" && !!selectedProject) ||
-      (categoryType === "service" && !!selectedServiceReport) ||
-      (categoryType === "other" && !!otherCategory)) &&
+    selectedFiles.length > 0 &&
     uploadErrors.length === 0;
 
   // Upload receipt file to Firebase Storage
@@ -180,6 +259,7 @@ export default function PurchaseOrderForm({
             active: vendorData.active,
             id: vendorData.id,
           });
+          setValue("vendor", vendorData.name);
         }
       }
 
@@ -214,38 +294,71 @@ export default function PurchaseOrderForm({
             balance: proj.balance ?? 0,
             createdAt: proj.createdAt ? proj.createdAt.toDate().toISOString() : "",
           });
+          setValue("projectDocId", proj.docId);
         }
-        setCategoryType("project");
+        setValue("categoryType", "project");
       } else if (purchaseOrder.serviceReportDocId) {
         const serviceReport = draftSR.find(
           (r) => r.docId === purchaseOrder.serviceReportDocId
         );
         setSelectedServiceReport(serviceReport || null);
-        setCategoryType("service");
+        if (serviceReport) {
+          setValue("serviceReportDocId", Number(serviceReport.docId));
+        }
+        setValue("categoryType", "service");
       } else if (purchaseOrder.otherCategory) {
-        setOtherCategory(purchaseOrder.otherCategory);
-        setCategoryType("other");
+        setValue("otherCategory", purchaseOrder.otherCategory);
+        setValue("categoryType", "other");
       } else {
-        setCategoryType("other");
+        setValue("categoryType", "other");
       }
       setServiceReports(draftSR);
     }
     initForm();
-  }, [purchaseOrder]);
+  }, [purchaseOrder, setValue]);
+
+  // Sync project selection with form state
+  useEffect(() => {
+    if (selectedProject) {
+      setValue("projectDocId", selectedProject.docId, { shouldValidate: true });
+    } else if (categoryType !== "project") {
+      setValue("projectDocId", null);
+    }
+  }, [selectedProject, categoryType, setValue]);
+
+  // Sync service report selection with form state
+  useEffect(() => {
+    if (selectedServiceReport) {
+      setValue("serviceReportDocId", Number(selectedServiceReport.docId), { shouldValidate: true });
+    } else if (categoryType !== "service") {
+      setValue("serviceReportDocId", null);
+    }
+  }, [selectedServiceReport, categoryType, setValue]);
+
+  // Sync vendor selection with form state
+  useEffect(() => {
+    if (vendor) {
+      setValue("vendor", vendor.name, { shouldValidate: true });
+    }
+  }, [vendor, setValue]);
 
   // Only show the input for the selected category, set others to null
   useEffect(() => {
     if (categoryType === "other") {
       setSelectedProject(null);
       setSelectedServiceReport(null);
+      setValue("projectDocId", null);
+      setValue("serviceReportDocId", null);
     } else if (categoryType === "project") {
-      setOtherCategory("");
+      setValue("otherCategory", "");
       setSelectedServiceReport(null);
+      setValue("serviceReportDocId", null);
     } else if (categoryType === "service") {
-      setOtherCategory("");
+      setValue("otherCategory", "");
       setSelectedProject(null);
+      setValue("projectDocId", null);
     }
-  }, [purchaseOrder, categoryType]);
+  }, [categoryType, setValue]);
 
   // Warn user if they try to navigate away during upload
   useEffect(() => {
@@ -299,23 +412,22 @@ export default function PurchaseOrderForm({
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      const formData = getValues();
       const orderRef = doc(firestore, "orders", purchaseOrder.id).withConverter(
         purchaseOrderConverter
       );
       const data: PurchaseOrder = {
         amount: getAmountAsNumber(),
         createdAt: purchaseOrder.createdAt,
-        description: description,
+        description: formData.description,
         docId: purchaseOrder.docId,
         id: purchaseOrder.id,
-        otherCategory: otherCategory || null,
-        projectDocId: selectedProject ? selectedProject.docId : null,
-        serviceReportDocId: selectedServiceReport
-          ? Number(selectedServiceReport.docId)
-          : null,
+        otherCategory: formData.otherCategory || null,
+        projectDocId: formData.projectDocId || null,
+        serviceReportDocId: formData.serviceReportDocId || null,
         status: "OPEN",
         technicianRef: purchaseOrder.technicianRef,
-        vendor: vendor ? vendor.name : "",
+        vendor: formData.vendor,
       };
       await setDoc(orderRef, data, { merge: true });
 
@@ -329,9 +441,7 @@ export default function PurchaseOrderForm({
   };
 
   // Submit (finalize)
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleSubmit = async (data: PurchaseOrderFormValues) => {
     // Prevent submission if any operation is already in progress
     if (isSaving || isSubmitting || isUploading) {
       return;
@@ -344,18 +454,6 @@ export default function PurchaseOrderForm({
 
     if (selectedFiles.length == 0) {
       toast.error("Please attach at least one receipt.");
-      return;
-    }
-
-    // Validate category BEFORE uploading files to avoid orphaned uploads
-    if (
-      (categoryType === "project" && !selectedProject) ||
-      (categoryType === "service" && !selectedServiceReport) ||
-      (categoryType === "other" && !otherCategory)
-    ) {
-      toast.error(
-        "Please fill in the required fields for the selected category."
-      );
       return;
     }
 
@@ -393,7 +491,7 @@ export default function PurchaseOrderForm({
 
       const message: PurchaseOrderMessage = {
         amount: getAmountAsNumber(),
-        materials: description,
+        materials: data.description,
         purchase_order_num: purchaseOrder.docId,
         project_info: selectedProject
           ? `${selectedProject.docId} - ${selectedProject.client} - ${selectedProject.location}`
@@ -401,8 +499,8 @@ export default function PurchaseOrderForm({
         service_report_info: selectedServiceReport
           ? `${selectedServiceReport.docId}`
           : null,
-        other: otherCategory || null,
-        vendor: vendor ? vendor.name : "",
+        other: data.otherCategory || null,
+        vendor: data.vendor,
         technician_name: technician ? technician.name : "",
         technician_phone: technician ? technician.phone : "",
         technician_email: technician ? technician.email : "",
@@ -426,23 +524,21 @@ export default function PurchaseOrderForm({
       const orderRef = doc(firestore, "orders", purchaseOrder.id).withConverter(
         purchaseOrderConverter
       );
-      const data: PurchaseOrder = {
+      const orderData: PurchaseOrder = {
         amount: getAmountAsNumber(),
         createdAt: purchaseOrder.createdAt,
-        description: description,
+        description: data.description,
         docId: purchaseOrder.docId,
         id: purchaseOrder.id,
-        otherCategory: otherCategory || null,
-        projectDocId: selectedProject ? selectedProject.docId : null,
-        serviceReportDocId: selectedServiceReport
-          ? Number(selectedServiceReport.docId)
-          : null,
+        otherCategory: data.otherCategory || null,
+        projectDocId: data.projectDocId || null,
+        serviceReportDocId: data.serviceReportDocId || null,
         status: "CLOSED",
         technicianRef: purchaseOrder.technicianRef,
-        vendor: vendor ? vendor.name : "",
+        vendor: data.vendor,
       };
 
-      await setDoc(orderRef, data, { merge: true });
+      await setDoc(orderRef, orderData, { merge: true });
 
       setIsUploading(false);
       setUploadProgress("");
@@ -496,136 +592,198 @@ export default function PurchaseOrderForm({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid gap-2">
-          <Label htmlFor="docId">PO Number</Label>
-          <Input
-            id="docId"
-            value={purchaseOrder.docId}
-            readOnly
-            className="w-full md:max-w-96"
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="vendor">Vendor *</Label>
-          <VendorSelect
-            selectedVendor={vendor}
-            setSelectedVendor={setVendor}
-            placeholder="Select a vendor"
-          />
-        </div>
-        <div className="grid gap-4">
-          <Label>Attach To *</Label>
-          <div className="flex gap-4">
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={categoryType === "service"}
-                onCheckedChange={(checked) =>
-                  checked ? setCategoryType("service") : setCategoryType(null)
-                }
-                id="switch-service"
-              />
-              <Label htmlFor="switch-service">Service Report</Label>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={categoryType === "project"}
-                onCheckedChange={(checked) =>
-                  checked ? setCategoryType("project") : setCategoryType(null)
-                }
-                id="switch-project"
-              />
-              <Label htmlFor="switch-project">Project</Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={categoryType === "other"}
-                onCheckedChange={(checked) =>
-                  checked ? setCategoryType("other") : setCategoryType(null)
-                }
-                id="switch-other"
-              />
-              <Label htmlFor="switch-other">Other</Label>
-            </div>
-          </div>
-        </div>
-        {categoryType === "other" && (
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
           <div className="grid gap-2">
-            <Label htmlFor="otherCategory">Other Category</Label>
+            <Label htmlFor="docId">PO Number</Label>
             <Input
-              id="otherCategory"
-              value={otherCategory}
-              onChange={(e) => setOtherCategory(e.target.value)}
+              id="docId"
+              value={purchaseOrder.docId}
+              readOnly
               className="w-full md:max-w-96"
-              placeholder="e.g. Truck Stock, Software License"
             />
           </div>
-        )}
-        {categoryType === "project" && (
-          <div className="grid gap-2">
-            <Label htmlFor="projectDocId">Project</Label>
-            <ProjectSelect
-              selectedProject={selectedProject}
-              setSelectedProject={setSelectedProject}
-            />
-          </div>
-        )}
-        {categoryType === "service" && (
-          <div className="grid gap-2">
-            <Label htmlFor="serviceReportDocId">Service Report</Label>
-            <ServiceReportSelect
-              selectedReport={selectedServiceReport}
-              setSelectedReport={setSelectedServiceReport}
-              reports={serviceReports}
-            />
-          </div>
-        )}
-        <div className="grid gap-2">
-          <Label htmlFor="amount">Amount *</Label>
-          <Input
-            id="amount"
-            type="text"
-            value={amount}
-            onChange={(e) => {
-              const value = e.target.value;
-              // Allow empty string, or valid number format (with optional negative, digits, and single decimal point)
-              if (
-                value === "" ||
-                value === "-" ||
-                value === "." ||
-                /^-?\d*\.?\d*$/.test(value)
-              ) {
-                setAmount(value);
-              }
-            }}
-            onBlur={() => {
-              // Validate and clean up on blur
-              const parsed = parseFloat(amount);
-              if (isNaN(parsed) || parsed <= 0) {
-                // Keep the current value if it's invalid, user can fix it
-                // Or clear it if empty
-                if (amount.trim() === "") {
-                  setAmount("");
-                }
-              } else {
-                // Format to remove leading zeros and unnecessary decimals
-                setAmount(parsed.toString());
-              }
-            }}
-            className="w-full md:max-w-96"
-            placeholder="0.00"
+          <FormField
+            control={form.control}
+            name="vendor"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Vendor *</FormLabel>
+                <FormControl>
+                  <VendorSelect
+                    selectedVendor={vendor}
+                    setSelectedVendor={(v) => {
+                      setVendor(v);
+                      field.onChange(v ? v.name : "");
+                    }}
+                    placeholder="Select a vendor"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
           />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="description">Description *</Label>
-          <Textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full min-h-[80px]"
+          <FormField
+            control={form.control}
+            name="categoryType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Attach To *</FormLabel>
+                <FormControl>
+                  <div className="flex gap-4">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={field.value === "service"}
+                        onCheckedChange={(checked) =>
+                          field.onChange(checked ? "service" : null)
+                        }
+                        id="switch-service"
+                      />
+                      <Label htmlFor="switch-service">Service Report</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={field.value === "project"}
+                        onCheckedChange={(checked) =>
+                          field.onChange(checked ? "project" : null)
+                        }
+                        id="switch-project"
+                      />
+                      <Label htmlFor="switch-project">Project</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={field.value === "other"}
+                        onCheckedChange={(checked) =>
+                          field.onChange(checked ? "other" : null)
+                        }
+                        id="switch-other"
+                      />
+                      <Label htmlFor="switch-other">Other</Label>
+                    </div>
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
           />
-        </div>
+          {categoryType === "other" && (
+            <FormField
+              control={form.control}
+              name="otherCategory"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Other Category *</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      className="w-full md:max-w-96"
+                      placeholder="e.g. Truck Stock, Software License"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+          {categoryType === "project" && (
+            <FormField
+              control={form.control}
+              name="projectDocId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Project *</FormLabel>
+                  <FormControl>
+                    <ProjectSelect
+                      selectedProject={selectedProject}
+                      setSelectedProject={(project) => {
+                        setSelectedProject(project);
+                        field.onChange(project ? project.docId : null);
+                      }}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+          {categoryType === "service" && (
+            <FormField
+              control={form.control}
+              name="serviceReportDocId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Service Report *</FormLabel>
+                  <FormControl>
+                    <ServiceReportSelect
+                      selectedReport={selectedServiceReport}
+                      setSelectedReport={(report) => {
+                        setSelectedServiceReport(report);
+                        field.onChange(report ? Number(report.docId) : null);
+                      }}
+                      reports={serviceReports}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+          <FormField
+            control={form.control}
+            name="amount"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Amount *</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    type="text"
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Allow empty string, or valid number format (with optional negative, digits, and single decimal point)
+                      if (
+                        value === "" ||
+                        value === "-" ||
+                        value === "." ||
+                        /^-?\d*\.?\d*$/.test(value)
+                      ) {
+                        field.onChange(value);
+                      }
+                    }}
+                    onBlur={() => {
+                      field.onBlur();
+                      // Validate and clean up on blur
+                      const parsed = parseFloat(field.value || "0");
+                      if (!isNaN(parsed) && parsed > 0) {
+                        // Format to remove leading zeros and unnecessary decimals
+                        field.onChange(parsed.toString());
+                      }
+                    }}
+                    className="w-full md:max-w-96"
+                    placeholder="0.00"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Description *</FormLabel>
+                <FormControl>
+                  <Textarea
+                    {...field}
+                    className="w-full min-h-[80px]"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         <div className="flex flex-col gap-2">
           <Label htmlFor="receipts">Receipts *</Label>
           <FileSelectButton
@@ -683,23 +841,24 @@ export default function PurchaseOrderForm({
             <span className="text-sm font-medium">{uploadProgress || "Uploading receipts..."}</span>
           </div>
         )}
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleSave}
-            disabled={isSaving || isSubmitting || isUploading}
-          >
-            {isSaving ? "Saving..." : "Save"}
-          </Button>
-          <Button
-            type="submit"
-            disabled={isSaving || isSubmitting || isUploading || !canSubmit}
-          >
-            {isUploading ? "Uploading..." : isSubmitting ? "Submitting..." : "Submit"}
-          </Button>
-        </div>
-      </form>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleSave}
+              disabled={isSaving || isSubmitting || isUploading}
+            >
+              {isSaving ? "Saving..." : "Save"}
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSaving || isSubmitting || isUploading || !canSubmit}
+            >
+              {isUploading ? "Uploading..." : isSubmitting ? "Submitting..." : "Submit"}
+            </Button>
+          </div>
+        </form>
+      </Form>
     </>
   );
 }
