@@ -216,7 +216,7 @@ describe('ProjectReportForm', () => {
     })
     
     // Mock Firestore addDoc to prevent actual save and redirect
-    const { addDoc } = require('firebase/firestore')
+    const { addDoc } = await import('firebase/firestore')
     const mockAddDoc = addDoc as jest.Mock
     mockAddDoc.mockResolvedValue({ id: 'test-id' })
     

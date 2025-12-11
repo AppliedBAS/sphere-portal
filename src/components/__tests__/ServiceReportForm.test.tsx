@@ -151,7 +151,6 @@ describe('ServiceReportForm', () => {
   }, 30000) // Increase timeout for this test
 
   it('validates service notes have required time fields', async () => {
-    const user = userEvent.setup()
     render(<ServiceReportForm authorTechnician={mockAuthorTechnician} />)
 
     const submitButton = screen.getByRole('button', { name: /submit/i })
@@ -251,14 +250,14 @@ describe('ServiceReportForm', () => {
     })
     
     // Mock Firestore functions to prevent actual save
-    const { addDoc, setDoc } = require('firebase/firestore')
+    const { addDoc, setDoc } = await import('firebase/firestore')
     const mockAddDoc = addDoc as jest.Mock
     const mockSetDoc = setDoc as jest.Mock
     mockAddDoc.mockResolvedValue({ id: 'test-id' })
     mockSetDoc.mockResolvedValue(undefined)
     
     // Mock reserveDocid
-    const { reserveDocid } = require('@/services/reportService')
+    const { reserveDocid } = await import('@/services/reportService')
     const mockReserveDocid = reserveDocid as jest.Mock
     mockReserveDocid.mockResolvedValue(1)
     

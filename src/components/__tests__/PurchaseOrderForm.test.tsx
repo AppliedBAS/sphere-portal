@@ -4,7 +4,7 @@
  * Tests form validation and interactions without submitting
  */
 
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import PurchaseOrderForm from '../PurchaseOrderForm'
 import { PurchaseOrder } from '@/models/PurchaseOrder'
@@ -130,8 +130,6 @@ describe('PurchaseOrderForm', () => {
 
     // Find the category switches
     const serviceSwitch = screen.getByLabelText(/service report/i)
-    const projectSwitch = screen.getByLabelText(/project/i)
-    const otherSwitch = screen.getByLabelText(/other/i)
 
     // Toggle switches
     if (serviceSwitch) {
@@ -185,7 +183,7 @@ describe('PurchaseOrderForm', () => {
     })
     
     // Mock Firestore setDoc to prevent actual save
-    const { setDoc } = require('firebase/firestore')
+    const { setDoc } = await import('firebase/firestore')
     const mockSetDoc = setDoc as jest.Mock
     mockSetDoc.mockResolvedValue(undefined)
     
